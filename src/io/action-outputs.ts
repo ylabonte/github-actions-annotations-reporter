@@ -8,10 +8,11 @@ export function isGitHubActionsEnv(env: NodeJS.ProcessEnv = process.env): boolea
 export interface EmitActionOutputsArgs {
   readonly summary: ReportSummary;
   readonly jsonPath: string | null;
+  readonly env?: NodeJS.ProcessEnv;
 }
 
 export function emitActionOutputs(args: EmitActionOutputsArgs): void {
-  if (!isGitHubActionsEnv()) return;
+  if (!isGitHubActionsEnv(args.env)) return;
   core.setOutput('new-issues', args.summary.newIssues);
   core.setOutput('updated-issues', args.summary.updatedIssues);
   core.setOutput('reopened-issues', args.summary.reopenedIssues);
@@ -23,6 +24,6 @@ export function emitActionOutputs(args: EmitActionOutputsArgs): void {
   if (args.jsonPath) core.setOutput('json', args.jsonPath);
 }
 
-export function failAction(message: string): void {
-  if (isGitHubActionsEnv()) core.setFailed(message);
+export function failAction(message: string, env?: NodeJS.ProcessEnv): void {
+  if (isGitHubActionsEnv(env)) core.setFailed(message);
 }
