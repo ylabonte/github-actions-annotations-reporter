@@ -23,6 +23,15 @@ describe('resolveAuth', () => {
     expect(result.token).toBe('gh-token');
   });
 
+  it('falls back to GH_TOKEN when GITHUB_TOKEN is empty / whitespace-only', async () => {
+    const result = await resolveAuth({
+      env: { GITHUB_TOKEN: '   ', GH_TOKEN: 'gh-token' },
+      runGhCli: vi.fn(),
+    });
+    expect(result.source).toBe('env');
+    expect(result.token).toBe('gh-token');
+  });
+
   it('calls gh CLI when env tokens are missing', async () => {
     const runGhCli = vi.fn().mockResolvedValue('cli-token');
     const result = await resolveAuth({ env: {}, runGhCli });

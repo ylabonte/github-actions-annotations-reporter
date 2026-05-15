@@ -25,9 +25,15 @@ export async function resolveAuth(options: ResolveAuthOptions = {}): Promise<Aut
   if (explicit) return { token: explicit, source: 'explicit' };
 
   const env = options.env ?? process.env;
-  const fromEnv = env['GITHUB_TOKEN'] ?? env['GH_TOKEN'];
-  if (fromEnv && fromEnv.trim().length > 0) {
-    return { token: fromEnv.trim(), source: 'env' };
+  // Normalize each candidate independently before combining. `??` would only
+  // fall through on null/undefined, so an empty-string `GITHUB_TOKEN` (a
+  // common CI pattern when a secret resolves but is empty) would shadow a
+  // valid `GH_TOKEN`. `||` on already-trimmed candidates picks the first
+  // non-empty value, which is the intent here.
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+  const fromEnv = env['GITHUB_TOKEN']?.trim() || env['GH_TOKEN']?.trim();
+  if (fromEnv) {
+    return { token: fromEnv, source: 'env' };
   }
 
   const runGh = options.runGhCli ?? defaultGhAuthToken;
