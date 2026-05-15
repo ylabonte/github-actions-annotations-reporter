@@ -1,0 +1,67 @@
+name: Action self-test
+
+on:
+  pull_request:
+    paths:
+      - 'action.yml'
+      - '.github/workflows/action-selftest.yml'
+      - 'dist/**'
+  workflow_dispatch:
+
+# Dry-run only — the self-test scans this repo's own annotations and refuses to write.
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  selftest:
+    name: Run the local composite action (dry-run)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # The action delegates to `npx github-actions-annotations-reporter@<version>`,
+      # which requires the package to exist on the npm registry. Before the first
+      # 1.0.0 publish there's nothing for npm to fetch, so the run step would 404.
+      # We probe the registry and skip the actual invocation in that pre-publish
+      # window — the workflow stays green and self-engages automatically the moment
+      # 1.0.0 lands on npm.
+      - name: Probe npm registry
+        id: published
+        run: |
+          set -euo pipefail
+          if npm view github-actions-annotations-reporter version --silent >/dev/null 2>&1; then
+            echo "yes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "yes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run the action
+        id: ghaar
+        if: steps.published.outputs.yes == 'true'
+        uses: ./
+        with:
+          dry-run: 'true'
+          min-severity: 'error'
+
+      - name: Assert outputs are present and well-formed
+        if: steps.published.outputs.yes == 'true'
+        env:
+          TOTAL: ${{ steps.ghaar.outputs.total-annotations }}
+          JSON_PATH: ${{ steps.ghaar.outputs.json }}
+        run: |
+          set -euo pipefail
+          test -n "$TOTAL" || { echo "::error::total-annotations output is empty"; exit 1; }
+          # Must be a non-negative integer.
+          [[ "$TOTAL" =~ ^[0-9]+$ ]] || { echo "::error::total-annotations '$TOTAL' is not numeric"; exit 1; }
+          test -f "$JSON_PATH" || { echo "::error::json output path missing: $JSON_PATH"; exit 1; }
+          jq -e '.schemaVersion == 1' "$JSON_PATH" >/dev/null 2>&1 \
+            || { echo "::error::expected schemaVersion=1 in JSON output"; cat "$JSON_PATH"; exit 1; }
+          jq -e '.summary | type == "object"' "$JSON_PATH" >/dev/null 2>&1 \
+            || { echo "::error::missing .summary object in JSON output"; cat "$JSON_PATH"; exit 1; }
+          echo "✓ self-test passed — total-annotations=$TOTAL"
+
+      - name: Skip notice (pre-publish)
+        if: steps.published.outputs.yes == 'false'
+        run: |
+          echo "::warning::Action self-test skipped: github-actions-annotations-reporter is not yet on npm. The workflow will start exercising the action automatically once 1.0.0 publishes."

@@ -1,0 +1,228 @@
+name: github-actions-annotations-reporter
+description: Scan the latest GitHub Actions workflow runs for annotations and file dedup-aware GitHub Issues, with severity filters, won't-fix history-aware suppression, and auto-close when annotations vanish.
+author: Yannic Labonte
+
+branding:
+  icon: alert-triangle
+  color: yellow
+
+inputs:
+  version:
+    description: 'npm tag or version of github-actions-annotations-reporter to run via `npx`. Defaults to `1`, matching the action major; override to pin tighter or to float across majors.'
+    required: false
+    default: '1'
+  github-token:
+    description: 'Token used for GitHub API auth. Defaults to the workflow-provided `github.token` when left empty.'
+    required: false
+    default: ''
+  workflows:
+    description: 'Space-separated globs of workflow names or paths to include (e.g. "ci.yml release.*").'
+    required: false
+    default: ''
+  reject:
+    description: 'Space-separated globs of workflows to exclude.'
+    required: false
+    default: ''
+  branch:
+    description: 'Branch whose latest run is scanned per workflow. Empty (the default) → the repo default branch.'
+    required: false
+    default: ''
+  min-severity:
+    description: 'Minimum annotation severity to file: notice, warning, or error.'
+    required: false
+    default: 'notice'
+  management-label:
+    description: 'Label applied to every issue managed by this action.'
+    required: false
+    default: 'automation/annotation-reporter'
+  max-issues:
+    description: 'Cap on the number of issue create/update/reopen writes per run. Auto-close is not capped.'
+    required: false
+    default: '25'
+  wontfix-labels:
+    description: 'Comma-separated labels on closed issues that should be treated as "won''t fix" suppressions.'
+    required: false
+    default: 'wontfix'
+  wontfix-respect-state-reason:
+    description: 'Treat `state_reason: not_planned` as a suppression signal on closed issues.'
+    required: false
+    default: 'true'
+  wontfix-comment-pattern:
+    description: 'Regex matched against the closing comment of a closed issue. Empty disables.'
+    required: false
+    default: ''
+  auto-close:
+    description: 'Auto-close managed issues whose annotation has vanished, subject to the guards below.'
+    required: false
+    default: 'true'
+  auto-close-after-days:
+    description: 'Minimum days since the annotation was last seen before auto-closing.'
+    required: false
+    default: '7'
+  auto-close-after-misses:
+    description: 'Minimum consecutive scans the annotation must be absent for before auto-closing.'
+    required: false
+    default: '3'
+  auto-close-require-success:
+    description: "Only consider auto-close when the workflow's latest run succeeded. Strongly recommended."
+    required: false
+    default: 'true'
+  dry-run:
+    description: 'Log what would change without creating, updating, or closing any issues.'
+    required: false
+    default: 'false'
+  fail-on-new:
+    description: 'Exit non-zero if any new issues were created on this run.'
+    required: false
+    default: 'false'
+  list-annotations:
+    description: 'Include every found annotation (full detail) in the JSON report under `annotations[]`.'
+    required: false
+    default: 'false'
+
+outputs:
+  new-issues:
+    description: 'Number of issues newly created on this run.'
+    value: ${{ steps.run.outputs.new-issues }}
+  updated-issues:
+    description: 'Number of existing open issues touched on this run.'
+    value: ${{ steps.run.outputs.updated-issues }}
+  reopened-issues:
+    description: 'Number of previously-closed issues reopened on this run.'
+    value: ${{ steps.run.outputs.reopened-issues }}
+  suppressed:
+    description: 'Annotations skipped because a prior closed issue matched a "won''t fix" signal.'
+    value: ${{ steps.run.outputs.suppressed }}
+  auto-closed:
+    description: 'Managed open issues auto-closed because their annotation has vanished.'
+    value: ${{ steps.run.outputs.auto-closed }}
+  total-annotations:
+    description: 'Total deduped annotations observed after severity filtering.'
+    value: ${{ steps.run.outputs.total-annotations }}
+  json:
+    description: 'Path to the JSON report file the action produced.'
+    value: ${{ steps.run.outputs.json }}
+
+runs:
+  using: composite
+  steps:
+    - id: run
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token != '' && inputs.github-token || github.token }}
+        GHAAR_VERSION: ${{ inputs.version }}
+        GHAAR_WORKFLOWS: ${{ inputs.workflows }}
+        GHAAR_REJECT: ${{ inputs.reject }}
+        GHAAR_BRANCH: ${{ inputs.branch }}
+        GHAAR_MIN_SEVERITY: ${{ inputs.min-severity }}
+        GHAAR_MANAGEMENT_LABEL: ${{ inputs.management-label }}
+        GHAAR_MAX_ISSUES: ${{ inputs.max-issues }}
+        GHAAR_WONTFIX_LABELS: ${{ inputs.wontfix-labels }}
+        GHAAR_WONTFIX_RESPECT_STATE_REASON: ${{ inputs.wontfix-respect-state-reason }}
+        GHAAR_WONTFIX_COMMENT_PATTERN: ${{ inputs.wontfix-comment-pattern }}
+        GHAAR_AUTO_CLOSE: ${{ inputs.auto-close }}
+        GHAAR_AUTO_CLOSE_AFTER_DAYS: ${{ inputs.auto-close-after-days }}
+        GHAAR_AUTO_CLOSE_AFTER_MISSES: ${{ inputs.auto-close-after-misses }}
+        GHAAR_AUTO_CLOSE_REQUIRE_SUCCESS: ${{ inputs.auto-close-require-success }}
+        GHAAR_DRY_RUN: ${{ inputs.dry-run }}
+        GHAAR_FAIL_ON_NEW: ${{ inputs.fail-on-new }}
+        GHAAR_LIST_ANNOTATIONS: ${{ inputs.list-annotations }}
+        GHAAR_REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+
+        # Validate `version` against a tight allowlist BEFORE it ever reaches `npx`.
+        # The package spec `github-actions-annotations-reporter@<version>` is parsed by
+        # npm, and npm accepts more than just semver/dist-tags — tarball URLs, git URLs,
+        # file paths, and alias syntax all resolve to arbitrary code that overrides the
+        # package name. If a caller ever wires this input from attacker-controllable data
+        # (issue body, PR title, etc.), the action would happily execute that code.
+        if [[ ! "$GHAAR_VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]]; then
+          echo "::error::Invalid 'version' input '${GHAAR_VERSION}'. Expected a dist-tag (e.g. 'latest', '1') or a semver (e.g. '1.2.3', '1.2.3-rc.1'); refusing to pass it to npx."
+          exit 1
+        fi
+
+        # Inputs reach the CLI through env vars set above (GHAAR_*), never inline via the
+        # template expression syntax, so glob/regex/label values cannot be shell-parsed.
+        # Each value is then pushed onto an args array so npx receives them as separate
+        # argv entries — no shell re-parsing.
+        args=(report --json --repo "$GHAAR_REPO")
+
+        # Word-split filters / rejections without invoking pathname expansion.
+        if [[ -n "$GHAAR_WORKFLOWS" ]]; then
+          read -r -a extra <<<"$GHAAR_WORKFLOWS"
+          if (( ${#extra[@]} > 0 )); then
+            args+=(--workflows "${extra[@]}")
+          fi
+        fi
+        if [[ -n "$GHAAR_REJECT" ]]; then
+          read -r -a extra <<<"$GHAAR_REJECT"
+          if (( ${#extra[@]} > 0 )); then
+            args+=(--reject "${extra[@]}")
+          fi
+        fi
+
+        [[ -n "$GHAAR_BRANCH"            ]] && args+=(--branch "$GHAAR_BRANCH")
+        [[ -n "$GHAAR_MIN_SEVERITY"      ]] && args+=(--min-severity "$GHAAR_MIN_SEVERITY")
+        [[ -n "$GHAAR_MANAGEMENT_LABEL"  ]] && args+=(--management-label "$GHAAR_MANAGEMENT_LABEL")
+        [[ -n "$GHAAR_MAX_ISSUES"        ]] && args+=(--max-issues "$GHAAR_MAX_ISSUES")
+        if [[ -n "$GHAAR_WONTFIX_LABELS" ]]; then
+          # Split comma-separated labels, drop empties, pass as repeated values.
+          IFS=',' read -r -a labels <<<"$GHAAR_WONTFIX_LABELS"
+          cleaned=()
+          for l in "${labels[@]}"; do
+            l_trim="$(echo "$l" | tr -d '[:space:]')"
+            [[ -n "$l_trim" ]] && cleaned+=("$l_trim")
+          done
+          if (( ${#cleaned[@]} > 0 )); then
+            args+=(--wontfix-labels "${cleaned[@]}")
+          fi
+        fi
+        [[ "$GHAAR_WONTFIX_RESPECT_STATE_REASON" == "false" ]] && args+=(--no-wontfix-respect-state-reason)
+        [[ -n "$GHAAR_WONTFIX_COMMENT_PATTERN" ]] && args+=(--wontfix-comment-pattern "$GHAAR_WONTFIX_COMMENT_PATTERN")
+        [[ "$GHAAR_AUTO_CLOSE"           == "false" ]] && args+=(--no-auto-close)
+        [[ -n "$GHAAR_AUTO_CLOSE_AFTER_DAYS"   ]] && args+=(--auto-close-after-days "$GHAAR_AUTO_CLOSE_AFTER_DAYS")
+        [[ -n "$GHAAR_AUTO_CLOSE_AFTER_MISSES" ]] && args+=(--auto-close-after-misses "$GHAAR_AUTO_CLOSE_AFTER_MISSES")
+        [[ "$GHAAR_AUTO_CLOSE_REQUIRE_SUCCESS" == "false" ]] && args+=(--no-auto-close-require-success)
+        [[ "$GHAAR_DRY_RUN"              == "true"  ]] && args+=(--dry-run)
+        [[ "$GHAAR_FAIL_ON_NEW"          == "true"  ]] && args+=(--fail-on-new)
+        [[ "$GHAAR_LIST_ANNOTATIONS"     == "true"  ]] && args+=(--list-annotations)
+
+        # Unique per-invocation report path so multiple uses in one job don't clobber each
+        # other's `json` output.
+        report=$(mktemp "$RUNNER_TEMP/ghaar.XXXXXXXX.json")
+        args+=(--json-out "$report")
+
+        # Run the CLI under suspended `errexit` so a non-zero exit (notably from
+        # --fail-on-new) does NOT kill the script before we've written outputs.
+        # Downstream steps need access to `json` / counts even when the action fails.
+        # `-p package binary` decouples the npm package name from its `bin` entry.
+        set +e
+        npx -y -p "github-actions-annotations-reporter@$GHAAR_VERSION" ghaar "${args[@]}"
+        cli_exit=$?
+        set -e
+
+        # The CLI itself sets GitHub outputs via @actions/core when GITHUB_ACTIONS=true.
+        # But we additionally surface the report path and key counters here, derived from
+        # the JSON, so callers can always rely on shell-level outputs even if @actions/core
+        # ever fails to set them (e.g. when the CLI errors after the pipeline runs but
+        # before emit). `// 0` handles missing fields; `2>/dev/null || echo 0` handles a
+        # broken/missing report.
+        new_issues=$(jq        '.summary.newIssues       // 0' "$report" 2>/dev/null || echo 0)
+        updated_issues=$(jq    '.summary.updatedIssues   // 0' "$report" 2>/dev/null || echo 0)
+        reopened_issues=$(jq   '.summary.reopenedIssues  // 0' "$report" 2>/dev/null || echo 0)
+        suppressed=$(jq        '.summary.suppressed      // 0' "$report" 2>/dev/null || echo 0)
+        auto_closed=$(jq       '.summary.autoClosed      // 0' "$report" 2>/dev/null || echo 0)
+        total_annotations=$(jq '.summary.totalAnnotations // 0' "$report" 2>/dev/null || echo 0)
+
+        {
+          echo "json=$report"
+          echo "new-issues=$new_issues"
+          echo "updated-issues=$updated_issues"
+          echo "reopened-issues=$reopened_issues"
+          echo "suppressed=$suppressed"
+          echo "auto-closed=$auto_closed"
+          echo "total-annotations=$total_annotations"
+        } >> "$GITHUB_OUTPUT"
+
+        exit "$cli_exit"

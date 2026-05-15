@@ -1,0 +1,135 @@
+#!/usr/bin/env node
+import { Command, Option } from '@commander-js/extra-typings';
+import { createRequire } from 'node:module';
+import { runScanCommand } from './commands/scan.js';
+import { runReportCommand } from './commands/report.js';
+import { runListCommand } from './commands/list.js';
+import { failAction } from './io/action-outputs.js';
+import type { CommonCliOptions } from './commands/shared.js';
+
+const require = createRequire(import.meta.url);
+interface PackageJson {
+  readonly version: string;
+}
+const pkg = require('../package.json') as PackageJson;
+
+/**
+ * Build the commander program without executing it. Exported for documentation
+ * tooling (`docs/scripts/gen-cli-ref.ts`) which calls `.helpInformation()`.
+ */
+export function buildProgram(): Command {
+  const program = new Command()
+    .name('ghaar')
+    .description(
+      'Scan the latest GitHub Actions workflow runs for annotations and file dedup-aware GitHub Issues.',
+    )
+    .version(pkg.version);
+
+  program
+    .addCommand(
+      buildCommand('scan', 'Scan and print/report; never writes issues')
+        .option(
+          '--list-annotations',
+          'Print every found annotation with full detail (also adds `annotations[]` to the JSON report)',
+        )
+        .action(async (_args, cmd) => {
+          process.exitCode = await runScanCommand(normalize(cmd.opts()));
+        }),
+    )
+    .addCommand(
+      buildCommand('report', 'Scan and reconcile issues (creates, updates, reopens, auto-closes)')
+        .option(
+          '--list-annotations',
+          'Print every found annotation with full detail (also adds `annotations[]` to the JSON report)',
+        )
+        .option('--fail-on-new', 'Exit non-zero if any new issues were created')
+        .action(async (_args, cmd) => {
+          process.exitCode = await runReportCommand(normalize(cmd.opts()));
+        }),
+    )
+    .addCommand(
+      buildCommand('list', 'List currently-managed issues').action(async (_args, cmd) => {
+        process.exitCode = await runListCommand(normalize(cmd.opts()));
+      }),
+    );
+
+  return program;
+}
+
+function buildCommand(name: string, description: string): Command {
+  const cmd = new Command(name).description(description);
+  cmd
+    .option('--token <token>', 'GitHub token (falls back to GITHUB_TOKEN / gh auth token)')
+    .option('--repo <owner/name>', 'Target repository (falls back to GITHUB_REPOSITORY)')
+    .option(
+      '--branch <branch>',
+      'Branch whose latest run is scanned (defaults to repo default branch)',
+    )
+    .option('--workflows <glob...>', 'Workflow include globs (matched against name and path)')
+    .option('--reject <glob...>', 'Workflow exclude globs')
+    .addOption(
+      new Option('--min-severity <severity>', 'Minimum severity to file').choices([
+        'notice',
+        'warning',
+        'error',
+      ]),
+    )
+    .option('--management-label <name>', 'Label applied to managed issues')
+    .option('--max-issues <n>', 'Cap on writes per run', (v) => Number.parseInt(v, 10))
+    .option('--wontfix-labels <label...>', 'Labels treated as "won\'t fix" suppressions')
+    .option('--no-wontfix-respect-state-reason', 'Ignore state_reason=not_planned suppression')
+    .option('--wontfix-comment-pattern <regex>', 'Regex matched against closing comments')
+    .option('--no-auto-close', 'Disable auto-close of vanished annotations')
+    .option('--auto-close-after-days <n>', 'Min absence days before auto-close', (v) =>
+      Number.parseInt(v, 10),
+    )
+    .option('--auto-close-after-misses <n>', 'Min consecutive misses before auto-close', (v) =>
+      Number.parseInt(v, 10),
+    )
+    .option('--no-auto-close-require-success', 'Allow auto-close even when latest run failed')
+    .option('--json', 'Emit a JSON report to stdout')
+    .option('--json-out <path>', 'Write JSON report to a file')
+    .option('--dry-run', 'Do not create/update/close any issues')
+    .option(
+      '--no-progress',
+      'Disable progress indicators (auto-disabled in non-TTY and --json modes)',
+    );
+  return cmd;
+}
+
+function normalize(opts: Record<string, unknown>): CommonCliOptions {
+  const minSeverity =
+    opts['minSeverity'] === 'notice' ||
+    opts['minSeverity'] === 'warning' ||
+    opts['minSeverity'] === 'error'
+      ? opts['minSeverity']
+      : undefined;
+  const out: Record<string, unknown> = { ...opts };
+  delete out['minSeverity'];
+  if (minSeverity) out['minSeverity'] = minSeverity;
+  return out;
+}
+
+// Only auto-invoke when run as the main entry point. Importing this module
+// (e.g. from `docs/scripts/gen-cli-ref.ts`) must NOT trigger arg parsing.
+const isMainModule = (() => {
+  if (!process.argv[1]) return false;
+  try {
+    return import.meta.url === new URL(`file://${process.argv[1]}`).toString();
+  } catch {
+    return false;
+  }
+})();
+
+/* c8 ignore start — exercised only as the CLI entrypoint, not in tests. */
+if (isMainModule) {
+  void buildProgram()
+    .parseAsync(process.argv)
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`ghaar: ${message}\n`);
+      failAction(message);
+      process.exitCode = 1;
+    });
+}
+/* c8 ignore stop */
