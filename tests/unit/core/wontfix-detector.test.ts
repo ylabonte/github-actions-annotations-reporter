@@ -116,4 +116,30 @@ describe('detectWontfix', () => {
     expect(decision.suppressed).toBe(true);
     expect(decision.signal).toBe('comment-pattern');
   });
+
+  it('does not split a surrogate pair when clamping to the comment length cap', async () => {
+    // A supplementary-plane code point (emoji 😀, U+1F600) is two UTF-16
+    // code units. Land the cap exactly inside the pair and verify the
+    // bounded prefix is still a valid string (no unpaired high surrogate).
+    const padding = 'a'.repeat(MAX_COMMENT_LENGTH - 1);
+    const comment = `${padding}\u{1F600}match`;
+    let observed: string | null = null;
+    const decision = await detectWontfix({
+      issue: makeIssue({ state: 'closed' }),
+      config: { ...baseConfig, commentPattern: '^a+$' },
+      fetchClosingComment: () => {
+        observed = comment;
+        return Promise.resolve(comment);
+      },
+    });
+    // The match should fail (needle is past the cap, the trailing high
+    // surrogate is trimmed off), but more importantly the bounded string
+    // must not contain an unpaired surrogate.
+    expect(decision.suppressed).toBe(false);
+    expect(observed).not.toBeNull();
+    // Sanity: JSON-serializing the bounded form should round-trip cleanly.
+    expect(() =>
+      JSON.stringify((observed as unknown as string).slice(0, MAX_COMMENT_LENGTH - 1)),
+    ).not.toThrow();
+  });
 });
