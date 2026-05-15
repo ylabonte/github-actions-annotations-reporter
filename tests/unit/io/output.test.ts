@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { renderActionsTable } from '../../../src/io/output/table.js';
 import { summaryLine } from '../../../src/io/output/formatter.js';
 import { buildJsonReport } from '../../../src/io/output/json.js';
+import { emitResults } from '../../../src/commands/shared.js';
 import { makeAnnotation, makeIssue, REPO } from '../../helpers/fixtures.js';
 import type { ReconcileAction, ReportSummary } from '../../../src/core/types.js';
 
@@ -137,5 +141,46 @@ describe('buildJsonReport', () => {
       includeAnnotations: true,
     });
     expect(report.annotations).toEqual([]);
+  });
+});
+
+describe('emitResults — --json-out file handling', () => {
+  let tmpRoot = '';
+
+  beforeEach(async () => {
+    tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'ghaar-emit-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('creates parent directories for --json-out paths that do not exist yet', async () => {
+    const nested = path.join(tmpRoot, 'deeply', 'nested', 'report.json');
+    const stdoutChunks: string[] = [];
+    const fakeStdout = {
+      write: (chunk: string): boolean => {
+        stdoutChunks.push(chunk);
+        return true;
+      },
+    } as unknown as NodeJS.WriteStream;
+
+    await emitResults({
+      opts: { jsonOut: nested },
+      result: {
+        summary,
+        actions: [],
+        annotations: [],
+        repo: REPO,
+        branch: 'main',
+      },
+      stdout: fakeStdout,
+    });
+
+    const written = await fs.readFile(nested, 'utf8');
+    const parsed = JSON.parse(written) as { schemaVersion: number };
+    expect(parsed.schemaVersion).toBe(1);
+    // The human-readable summary should have been printed too (since --json wasn't set).
+    expect(stdoutChunks.join('')).toContain('annotations: 3');
   });
 });
