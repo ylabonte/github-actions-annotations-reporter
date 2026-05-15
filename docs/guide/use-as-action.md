@@ -120,15 +120,17 @@ Without it, the JSON shape is unchanged — existing consumers keep working.
 
 ## Outputs
 
-| Output              | Description                                                                 |
-| ------------------- | --------------------------------------------------------------------------- |
-| `new-issues`        | Count of issues newly created on this run.                                  |
-| `updated-issues`    | Count of existing open issues touched.                                      |
-| `reopened-issues`   | Count of previously-closed issues reopened.                                 |
-| `suppressed`        | Count of annotations skipped due to a won't-fix signal.                     |
-| `auto-closed`       | Count of managed open issues auto-closed because their annotation vanished. |
-| `total-annotations` | Total deduped annotations observed after severity filtering.                |
-| `json`              | Path to the JSON report file (always written via `mktemp`).                 |
+| Output              | Description                                                                     |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `new-issues`        | Count of issues newly created on this run.                                      |
+| `updated-issues`    | Count of existing open issues touched.                                          |
+| `reopened-issues`   | Count of previously-closed issues reopened.                                     |
+| `suppressed`        | Count of annotations skipped due to a won't-fix signal.                         |
+| `auto-closed`       | Count of managed open issues auto-closed because their annotation vanished.     |
+| `auto-close-held`   | Vanished annotations whose issue is being held pending more misses or more age. |
+| `skipped`           | Create / update / reopen actions dropped because `max-issues` was exhausted.    |
+| `total-annotations` | Total deduped annotations observed after severity filtering.                    |
+| `json`              | Path to the JSON report file (always written via `mktemp`).                     |
 
 ## Permissions
 

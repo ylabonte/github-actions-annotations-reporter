@@ -111,6 +111,10 @@ describe('runPipeline — edge cases', () => {
     expect(result.summary.newIssues).toBe(2);
     // The fingerprint dedupe in the collector keeps all 5 distinct annotations.
     expect(result.summary.totalAnnotations).toBe(5);
+    // The remaining 3 create actions hit the maxIssues cap and are tallied as
+    // skipped so users can see the cap fired (previously they were silently
+    // dropped from the summary).
+    expect(result.summary.skipped).toBe(3);
   });
 
   it('escalates severity labels: warning issue gets severity/error if annotation upgrades', async () => {

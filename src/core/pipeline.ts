@@ -106,6 +106,7 @@ export async function runPipeline(options: RunPipelineOptions): Promise<RunPipel
     suppressed: 0,
     autoClosed: 0,
     autoCloseHeld: 0,
+    skipped: 0,
     dryRun: options.dryRun,
   };
 
@@ -212,7 +213,10 @@ async function applyActions(args: ApplyArgs): Promise<ReportSummary> {
     );
     if (action.kind === 'create' || action.kind === 'update' || action.kind === 'reopen') {
       if (writeBudget <= 0) {
-        // Convert to "held" so users can see they hit the cap rather than silently dropping.
+        // Cap exhausted — tally as `skipped` so the summary makes the cap
+        // visible (max-issues counts only write actions; auto-close is never
+        // throttled and never contributes to this counter).
+        summary = { ...summary, skipped: summary.skipped + 1 };
         continue;
       }
       writeBudget -= 1;

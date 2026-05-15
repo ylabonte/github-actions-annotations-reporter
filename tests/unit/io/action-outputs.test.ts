@@ -15,6 +15,7 @@ const summary: ReportSummary = {
   suppressed: 1,
   autoClosed: 0,
   autoCloseHeld: 0,
+  skipped: 0,
   dryRun: false,
 };
 
@@ -58,6 +59,8 @@ describe('emitActionOutputs / failAction', () => {
     expect(setOutput).toHaveBeenCalledWith('new-issues', 2);
     expect(setOutput).toHaveBeenCalledWith('updated-issues', 1);
     expect(setOutput).toHaveBeenCalledWith('suppressed', 1);
+    expect(setOutput).toHaveBeenCalledWith('auto-close-held', 0);
+    expect(setOutput).toHaveBeenCalledWith('skipped', 0);
     expect(setOutput).toHaveBeenCalledWith('total-annotations', 4);
     expect(setOutput).toHaveBeenCalledWith('json', '/tmp/x.json');
   });

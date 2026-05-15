@@ -11,6 +11,7 @@ const summary: ReportSummary = {
   suppressed: 0,
   autoClosed: 1,
   autoCloseHeld: 0,
+  skipped: 0,
   dryRun: false,
 };
 

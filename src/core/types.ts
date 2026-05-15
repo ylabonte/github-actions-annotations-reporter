@@ -114,5 +114,11 @@ export interface ReportSummary {
   readonly suppressed: number;
   readonly autoClosed: number;
   readonly autoCloseHeld: number;
+  /**
+   * Count of create/update/reopen actions that were dropped because `maxIssues`
+   * was already exhausted. Auto-close is never throttled, so it can never
+   * contribute to this counter.
+   */
+  readonly skipped: number;
   readonly dryRun: boolean;
 }

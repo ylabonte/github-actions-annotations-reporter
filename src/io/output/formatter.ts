@@ -39,6 +39,7 @@ export function summaryLine(summary: ReportSummary): string {
     `suppressed: ${pc.gray(summary.suppressed.toString())}`,
     `auto-closed: ${pc.cyan(summary.autoClosed.toString())}`,
     `held: ${pc.gray(summary.autoCloseHeld.toString())}`,
+    `skipped: ${pc.yellow(summary.skipped.toString())}`,
   ];
   if (summary.dryRun) parts.push(pc.dim('(dry run)'));
   return parts.join('  ');

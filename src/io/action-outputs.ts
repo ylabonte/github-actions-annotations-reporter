@@ -18,6 +18,7 @@ export function emitActionOutputs(args: EmitActionOutputsArgs): void {
   core.setOutput('suppressed', args.summary.suppressed);
   core.setOutput('auto-closed', args.summary.autoClosed);
   core.setOutput('auto-close-held', args.summary.autoCloseHeld);
+  core.setOutput('skipped', args.summary.skipped);
   core.setOutput('total-annotations', args.summary.totalAnnotations);
   if (args.jsonPath) core.setOutput('json', args.jsonPath);
 }

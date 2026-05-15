@@ -96,6 +96,12 @@ outputs:
   auto-closed:
     description: 'Managed open issues auto-closed because their annotation has vanished.'
     value: ${{ steps.run.outputs.auto-closed }}
+  auto-close-held:
+    description: 'Managed open issues whose annotation has vanished but that did not meet the auto-close threshold yet (miss counter + age window).'
+    value: ${{ steps.run.outputs.auto-close-held }}
+  skipped:
+    description: 'Create / update / reopen actions that were dropped because `max-issues` was already exhausted on this run.'
+    value: ${{ steps.run.outputs.skipped }}
   total-annotations:
     description: 'Total deduped annotations observed after severity filtering.'
     value: ${{ steps.run.outputs.total-annotations }}
@@ -213,6 +219,8 @@ runs:
         reopened_issues=$(jq   '.summary.reopenedIssues  // 0' "$report" 2>/dev/null || echo 0)
         suppressed=$(jq        '.summary.suppressed      // 0' "$report" 2>/dev/null || echo 0)
         auto_closed=$(jq       '.summary.autoClosed      // 0' "$report" 2>/dev/null || echo 0)
+        auto_close_held=$(jq   '.summary.autoCloseHeld   // 0' "$report" 2>/dev/null || echo 0)
+        skipped=$(jq           '.summary.skipped         // 0' "$report" 2>/dev/null || echo 0)
         total_annotations=$(jq '.summary.totalAnnotations // 0' "$report" 2>/dev/null || echo 0)
 
         {
@@ -222,6 +230,8 @@ runs:
           echo "reopened-issues=$reopened_issues"
           echo "suppressed=$suppressed"
           echo "auto-closed=$auto_closed"
+          echo "auto-close-held=$auto_close_held"
+          echo "skipped=$skipped"
           echo "total-annotations=$total_annotations"
         } >> "$GITHUB_OUTPUT"
 
