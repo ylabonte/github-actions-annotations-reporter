@@ -5,7 +5,7 @@ API. Two patterns trim that down.
 
 ## `workflows` — include only matching
 
-Space-separated globs, matched against:
+Whitespace-separated globs, matched against:
 
 - the workflow's display name (e.g. `CI`),
 - its repo-relative path (e.g. `.github/workflows/ci.yml`),

@@ -16,11 +16,11 @@ inputs:
     required: false
     default: ''
   workflows:
-    description: 'Space-separated globs of workflow names or paths to include (e.g. "ci.yml release.*").'
+    description: 'Whitespace-separated globs of workflow names or paths to include (e.g. "ci.yml release.*"). Individual globs may not contain whitespace — match names that do with a glob (e.g. "My*CI").'
     required: false
     default: ''
   reject:
-    description: 'Space-separated globs of workflows to exclude.'
+    description: 'Whitespace-separated globs of workflows to exclude. Same whitespace caveat as `workflows`.'
     required: false
     default: ''
   branch:
@@ -173,11 +173,13 @@ runs:
         [[ -n "$GHAAR_MANAGEMENT_LABEL"  ]] && args+=(--management-label "$GHAAR_MANAGEMENT_LABEL")
         [[ -n "$GHAAR_MAX_ISSUES"        ]] && args+=(--max-issues "$GHAAR_MAX_ISSUES")
         if [[ -n "$GHAAR_WONTFIX_LABELS" ]]; then
-          # Split comma-separated labels, drop empties, pass as repeated values.
+          # Split comma-separated labels, trim leading/trailing whitespace
+          # only (preserving internal spaces — GitHub allows multi-word
+          # labels), drop empties, pass as repeated values.
           IFS=',' read -r -a labels <<<"$GHAAR_WONTFIX_LABELS"
           cleaned=()
           for l in "${labels[@]}"; do
-            l_trim="$(echo "$l" | tr -d '[:space:]')"
+            l_trim="$(echo "$l" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
             [[ -n "$l_trim" ]] && cleaned+=("$l_trim")
           done
           if (( ${#cleaned[@]} > 0 )); then

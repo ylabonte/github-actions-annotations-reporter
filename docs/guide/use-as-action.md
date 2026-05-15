@@ -97,26 +97,26 @@ Without it, the JSON shape is unchanged — existing consumers keep working.
 
 ## Inputs
 
-| Input                          | Default                          | Description                                                                            |
-| ------------------------------ | -------------------------------- | -------------------------------------------------------------------------------------- |
-| `version`                      | `1`                              | npm tag/version of the package to run via `npx`. Pinned to the action major.           |
-| `github-token`                 | workflow `github.token`          | Token used for API auth.                                                               |
-| `workflows`                    | _(empty)_                        | Space-separated globs of workflow names/paths to include.                              |
-| `reject`                       | _(empty)_                        | Space-separated globs to exclude.                                                      |
-| `branch`                       | repo default branch              | Branch whose latest run is scanned per workflow.                                       |
-| `min-severity`                 | `notice`                         | Minimum severity to file (`notice` / `warning` / `error`).                             |
-| `management-label`             | `automation/annotation-reporter` | Label applied to every managed issue.                                                  |
-| `max-issues`                   | `25`                             | Cap on create/update/reopen writes per run. Auto-close is unthrottled.                 |
-| `wontfix-labels`               | `wontfix`                        | Comma-separated labels treated as won't-fix on closed issues.                          |
-| `wontfix-respect-state-reason` | `true`                           | Honor `state_reason: not_planned` as a suppression signal.                             |
-| `wontfix-comment-pattern`      | _(empty)_                        | Regex matched against the closing comment.                                             |
-| `auto-close`                   | `true`                           | Auto-close managed issues whose annotation has vanished.                               |
-| `auto-close-after-days`        | `7`                              | Min days since last-seen before auto-close.                                            |
-| `auto-close-after-misses`      | `3`                              | Min consecutive misses before auto-close.                                              |
-| `auto-close-require-success`   | `true`                           | Only consider auto-close when the workflow's latest run succeeded.                     |
-| `dry-run`                      | `false`                          | Log what would change without any writes.                                              |
-| `fail-on-new`                  | `false`                          | Exit non-zero if any new issues were created.                                          |
-| `list-annotations`             | `false`                          | Include every found annotation (full detail) in the JSON report under `annotations[]`. |
+| Input                          | Default                          | Description                                                                                                 |
+| ------------------------------ | -------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `version`                      | `1`                              | npm tag/version of the package to run via `npx`. Pinned to the action major.                                |
+| `github-token`                 | workflow `github.token`          | Token used for API auth.                                                                                    |
+| `workflows`                    | _(empty)_                        | Whitespace-separated globs of workflow names/paths to include. Individual globs may not contain whitespace. |
+| `reject`                       | _(empty)_                        | Whitespace-separated globs to exclude. Same whitespace caveat as `workflows`.                               |
+| `branch`                       | repo default branch              | Branch whose latest run is scanned per workflow.                                                            |
+| `min-severity`                 | `notice`                         | Minimum severity to file (`notice` / `warning` / `error`).                                                  |
+| `management-label`             | `automation/annotation-reporter` | Label applied to every managed issue.                                                                       |
+| `max-issues`                   | `25`                             | Cap on create/update/reopen writes per run. Auto-close is unthrottled.                                      |
+| `wontfix-labels`               | `wontfix`                        | Comma-separated labels treated as won't-fix on closed issues.                                               |
+| `wontfix-respect-state-reason` | `true`                           | Honor `state_reason: not_planned` as a suppression signal.                                                  |
+| `wontfix-comment-pattern`      | _(empty)_                        | Regex matched against the closing comment.                                                                  |
+| `auto-close`                   | `true`                           | Auto-close managed issues whose annotation has vanished.                                                    |
+| `auto-close-after-days`        | `7`                              | Min days since last-seen before auto-close.                                                                 |
+| `auto-close-after-misses`      | `3`                              | Min consecutive misses before auto-close.                                                                   |
+| `auto-close-require-success`   | `true`                           | Only consider auto-close when the workflow's latest run succeeded.                                          |
+| `dry-run`                      | `false`                          | Log what would change without any writes.                                                                   |
+| `fail-on-new`                  | `false`                          | Exit non-zero if any new issues were created.                                                               |
+| `list-annotations`             | `false`                          | Include every found annotation (full detail) in the JSON report under `annotations[]`.                      |
 
 ## Outputs
 
