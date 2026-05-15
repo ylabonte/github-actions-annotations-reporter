@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { runPipeline } from '../../../src/core/pipeline.js';
 import { ConfigSchema, parseUserConfig } from '../../../src/core/config.js';
 import { makeFakeOctokit, type FakeIssue } from '../../helpers/fake-octokit.js';
@@ -242,16 +242,25 @@ describe('runPipeline — create / update / auto-close', () => {
   });
 
   it('throws when the repository cannot be determined', async () => {
-    const { octokit } = makeFakeOctokit(freshState());
-    await expect(
-      runPipeline({
-        config: ConfigSchema.parse(parseUserConfig({})),
-        explicitToken: 'tok',
-        dryRun: false,
-        applyMode: true,
-        now: new Date('2026-05-15T10:00:00Z'),
-        octokit,
-      }),
-    ).rejects.toThrow(/repository/i);
+    // GitHub Actions runners auto-set GITHUB_REPOSITORY, which would let
+    // resolveRepoFromEnv() succeed and short-circuit the throw. Clear it
+    // (and GH_TOKEN, which the auth chain would otherwise read) so the
+    // test exercises the "no repo" branch on every host.
+    vi.stubEnv('GITHUB_REPOSITORY', '');
+    try {
+      const { octokit } = makeFakeOctokit(freshState());
+      await expect(
+        runPipeline({
+          config: ConfigSchema.parse(parseUserConfig({})),
+          explicitToken: 'tok',
+          dryRun: false,
+          applyMode: true,
+          now: new Date('2026-05-15T10:00:00Z'),
+          octokit,
+        }),
+      ).rejects.toThrow(/repository/i);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
