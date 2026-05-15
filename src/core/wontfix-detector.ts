@@ -1,5 +1,16 @@
 import type { IssueRecord } from './types.js';
 
+/**
+ * Caps on user-supplied regex inputs. Both surfaces are reachable from
+ * untrusted config: a pathological pattern combined with a crafted closing
+ * comment could trigger catastrophic backtracking. The pattern cap rejects
+ * absurdly long patterns outright; the comment cap bounds the test input so
+ * even a poorly-written user pattern can't exceed roughly linear work in the
+ * size of the cap.
+ */
+export const MAX_PATTERN_LENGTH = 1000;
+export const MAX_COMMENT_LENGTH = 64 * 1024;
+
 export interface WontfixConfig {
   readonly labels: readonly string[];
   readonly respectStateReason: boolean;
@@ -48,7 +59,15 @@ export async function detectWontfix(options: DetectWontfixOptions): Promise<Wont
     const regex = safeCompile(config.commentPattern);
     if (regex) {
       const comment = await fetchClosingComment();
-      if (comment && regex.test(comment)) {
+      // Cap the tested string length to bound regex evaluation cost on long
+      // attacker-controlled comments. A wontfix marker would land near the
+      // top of any reasonable comment anyway, so truncation rarely loses a
+      // real signal.
+      const bounded =
+        comment != null && comment.length > MAX_COMMENT_LENGTH
+          ? comment.slice(0, MAX_COMMENT_LENGTH)
+          : comment;
+      if (bounded && regex.test(bounded)) {
         return {
           suppressed: true,
           signal: 'comment-pattern',
@@ -62,6 +81,7 @@ export async function detectWontfix(options: DetectWontfixOptions): Promise<Wont
 }
 
 function safeCompile(pattern: string): RegExp | null {
+  if (pattern.length > MAX_PATTERN_LENGTH) return null;
   try {
     return new RegExp(pattern);
   } catch {
