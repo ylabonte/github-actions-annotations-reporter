@@ -73,7 +73,12 @@ export function parseFingerprintMarker(body: string): string | null {
 }
 
 export function parseIssueState(body: string): IssueState | null {
-  const match = /<!--\s*annot-state:\s*({[^]*?})\s*-->/.exec(body);
+  // The marker is rendered as a single line `<!-- annot-state: <json> -->`,
+  // so anchor the match to a single line and capture everything between the
+  // label and the trailing `-->`. This is brace-balance-agnostic — a future
+  // nested-object field in the state JSON won't be truncated at its first
+  // inner `}` the way a `{[^]*?}` capture would.
+  const match = /^<!--\s*annot-state:\s*(.+?)\s*-->\s*$/m.exec(body);
   if (match?.[1] == null) return null;
   try {
     const obj = JSON.parse(match[1]) as Partial<IssueState>;

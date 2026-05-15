@@ -66,6 +66,20 @@ describe('renderIssueBody / parsers', () => {
     expect(parseIssueState('no state')).toBeNull();
   });
 
+  it('parseIssueState tolerates a state payload with nested braces', () => {
+    // Future-proofs the parser: a non-greedy `{...}` capture would have
+    // stopped at the first inner `}` and tripped JSON.parse.
+    const body = [
+      '<!-- annot-state: {"lastSeenAt":"2026-05-15T00:00:00.000Z","missCounter":0,"firstSeenAt":"2026-05-01T00:00:00.000Z","workflowPath":".github/workflows/ci.yml","extra":{"nested":{"deep":1}}} -->',
+    ].join('\n');
+    expect(parseIssueState(body)).toEqual({
+      lastSeenAt: '2026-05-15T00:00:00.000Z',
+      missCounter: 0,
+      firstSeenAt: '2026-05-01T00:00:00.000Z',
+      workflowPath: '.github/workflows/ci.yml',
+    });
+  });
+
   it('renderIssueTitle truncates long messages', () => {
     const annotation = makeAnnotation({ message: 'x'.repeat(300) });
     const title = renderIssueTitle(annotation);
