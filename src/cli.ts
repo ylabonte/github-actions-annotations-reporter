@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { Command, Option } from '@commander-js/extra-typings';
+import { Command, InvalidArgumentError, Option } from '@commander-js/extra-typings';
 import { createRequire } from 'node:module';
 import { runScanCommand } from './commands/scan.js';
 import { runReportCommand } from './commands/report.js';
@@ -75,16 +75,20 @@ function buildCommand(name: string, description: string): Command {
       ]),
     )
     .option('--management-label <name>', 'Label applied to managed issues')
-    .option('--max-issues <n>', 'Cap on writes per run', (v) => Number.parseInt(v, 10))
+    .option('--max-issues <n>', 'Cap on writes per run', parseIntegerArg('--max-issues'))
     .option('--wontfix-labels <label...>', 'Labels treated as "won\'t fix" suppressions')
     .option('--no-wontfix-respect-state-reason', 'Ignore state_reason=not_planned suppression')
     .option('--wontfix-comment-pattern <regex>', 'Regex matched against closing comments')
     .option('--no-auto-close', 'Disable auto-close of vanished annotations')
-    .option('--auto-close-after-days <n>', 'Min absence days before auto-close', (v) =>
-      Number.parseInt(v, 10),
+    .option(
+      '--auto-close-after-days <n>',
+      'Min absence days before auto-close',
+      parseIntegerArg('--auto-close-after-days'),
     )
-    .option('--auto-close-after-misses <n>', 'Min consecutive misses before auto-close', (v) =>
-      Number.parseInt(v, 10),
+    .option(
+      '--auto-close-after-misses <n>',
+      'Min consecutive misses before auto-close',
+      parseIntegerArg('--auto-close-after-misses'),
     )
     .option('--no-auto-close-require-success', 'Allow auto-close even when latest run failed')
     .option('--json', 'Emit a JSON report to stdout')
@@ -95,6 +99,16 @@ function buildCommand(name: string, description: string): Command {
       'Disable progress indicators (auto-disabled in non-TTY and --json modes)',
     );
   return cmd;
+}
+
+function parseIntegerArg(flag: string): (value: string) => number {
+  return (value) => {
+    const n = Number.parseInt(value, 10);
+    if (Number.isNaN(n)) {
+      throw new InvalidArgumentError(`${flag} expects an integer, got "${value}"`);
+    }
+    return n;
+  };
 }
 
 function normalize(opts: Record<string, unknown>): CommonCliOptions {

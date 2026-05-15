@@ -41,9 +41,10 @@ export function evaluateAutoClose(args: EvaluateAutoCloseArgs): AutoCloseDecisio
       return { kind: 'skip', reason: 'no recent run to confirm success' };
     }
     if (workflowLatestRun.conclusion !== 'success') {
+      const conclusion = workflowLatestRun.conclusion ?? '(no conclusion)';
       return {
         kind: 'skip',
-        reason: `latest run concluded "${String(workflowLatestRun.conclusion)}" — refusing to auto-close on potentially incomplete data`,
+        reason: `latest run concluded "${conclusion}" — refusing to auto-close on potentially incomplete data`,
       };
     }
   }

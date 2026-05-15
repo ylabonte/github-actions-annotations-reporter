@@ -7,12 +7,13 @@ const NO_FILE = '(no file)';
 const DIVIDER_WIDTH = 60;
 
 /**
- * Per-field render cap for the human-readable listing. Bounds pathological
- * inputs (a multi-megabyte stack trace, a binary blob smuggled into a
- * `raw_details`) so the terminal doesn't lock up. JSON output is unaffected;
- * consumers reading `--json` see the full payload.
+ * Per-field render cap for the human-readable listing, measured in UTF-16
+ * code units (i.e. JavaScript `string.length`, not UTF-8 bytes). Bounds
+ * pathological inputs (a multi-megabyte stack trace, a binary blob smuggled
+ * into a `raw_details`) so the terminal doesn't lock up. JSON output is
+ * unaffected; consumers reading `--json` see the full payload.
  */
-export const MAX_RENDERED_FIELD_BYTES = 4 * 1024;
+export const MAX_RENDERED_FIELD_CHARS = 4 * 1024;
 
 export function renderAnnotationsList(annotations: readonly Annotation[]): string {
   if (annotations.length === 0) return '(no annotations)';
@@ -22,7 +23,7 @@ export function renderAnnotationsList(annotations: readonly Annotation[]): strin
 function renderBlock(annotation: Annotation, index: number): string {
   const conclusion = annotation.run.conclusion ?? '(no conclusion)';
   const shortSha = annotation.run.headSha.slice(0, 7);
-  const message = truncate(annotation.message, MAX_RENDERED_FIELD_BYTES);
+  const message = truncate(annotation.message, MAX_RENDERED_FIELD_CHARS);
   const lines: string[] = [
     divider(index),
     `  Severity:    ${colorSeverity(annotation.severity, annotation.severity)}`,
@@ -35,13 +36,13 @@ function renderBlock(annotation: Annotation, index: number): string {
     `  Title:       ${annotation.title ?? NONE}`,
     `  Message:`,
     indent(message.body),
-    ...(message.truncated ? [indent(truncationMarker(message.elidedBytes))] : []),
+    ...(message.truncated ? [indent(truncationMarker(message.elidedChars))] : []),
   ];
   if (annotation.rawDetails !== null) {
-    const details = truncate(annotation.rawDetails, MAX_RENDERED_FIELD_BYTES);
+    const details = truncate(annotation.rawDetails, MAX_RENDERED_FIELD_CHARS);
     lines.push(`  Raw details:`, indent(details.body));
     if (details.truncated) {
-      lines.push(indent(truncationMarker(details.elidedBytes)));
+      lines.push(indent(truncationMarker(details.elidedChars)));
     }
   }
   return lines.join('\n');
@@ -72,16 +73,16 @@ function indent(text: string): string {
 interface Truncated {
   readonly body: string;
   readonly truncated: boolean;
-  readonly elidedBytes: number;
+  readonly elidedChars: number;
 }
 
 function truncate(text: string, max: number): Truncated {
-  if (text.length <= max) return { body: text, truncated: false, elidedBytes: 0 };
-  return { body: text.slice(0, max), truncated: true, elidedBytes: text.length - max };
+  if (text.length <= max) return { body: text, truncated: false, elidedChars: 0 };
+  return { body: text.slice(0, max), truncated: true, elidedChars: text.length - max };
 }
 
-function truncationMarker(elidedBytes: number): string {
+function truncationMarker(elidedChars: number): string {
   return pc.dim(
-    `… (truncated, ${elidedBytes.toString()} more bytes — use --json for the full payload)`,
+    `… (truncated, ${elidedChars.toString()} more characters — use --json for the full payload)`,
   );
 }

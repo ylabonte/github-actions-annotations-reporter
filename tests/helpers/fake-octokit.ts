@@ -109,7 +109,7 @@ export function makeFakeOctokit(state: FakeOctokitState): {
         return Promise.resolve({ data: issue?.comments ?? [] });
       },
       create: (p: { title: string; body: string; labels: string[] }) => {
-        const number = (state.issues.at(-1)?.number ?? 0) + 1;
+        const number = Math.max(0, ...state.issues.map((i) => i.number)) + 1;
         const newIssue: FakeIssue = {
           number,
           state: 'open',

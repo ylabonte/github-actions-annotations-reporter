@@ -244,9 +244,11 @@ describe('runPipeline — create / update / auto-close', () => {
   it('throws when the repository cannot be determined', async () => {
     // GitHub Actions runners auto-set GITHUB_REPOSITORY, which would let
     // resolveRepoFromEnv() succeed and short-circuit the throw. Clear it
-    // (and GH_TOKEN, which the auth chain would otherwise read) so the
-    // test exercises the "no repo" branch on every host.
+    // (and GH_TOKEN / GITHUB_TOKEN, which the auth chain would otherwise
+    // read) so the test exercises the "no repo" branch on every host.
     vi.stubEnv('GITHUB_REPOSITORY', '');
+    vi.stubEnv('GH_TOKEN', '');
+    vi.stubEnv('GITHUB_TOKEN', '');
     try {
       const { octokit } = makeFakeOctokit(freshState());
       await expect(
