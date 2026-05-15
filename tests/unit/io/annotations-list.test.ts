@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  MAX_RENDERED_FIELD_BYTES,
+  MAX_RENDERED_FIELD_CHARS,
   renderAnnotationsList,
 } from '../../../src/io/output/annotations-list.js';
 import { makeAnnotation } from '../../helpers/fixtures.js';
 
 function strip(text: string): string {
   // eslint-disable-next-line no-control-regex
-  return text.replaceAll(/\[[0-9;]*m/g, '');
+  return text.replaceAll(/\u001B\[[0-9;]*m/g, '');
 }
 
 describe('renderAnnotationsList', () => {
@@ -88,22 +88,22 @@ describe('renderAnnotationsList', () => {
 
   it('truncates message bodies that exceed the field cap', () => {
     const overflow = 250;
-    const ann = makeAnnotation({ message: 'x'.repeat(MAX_RENDERED_FIELD_BYTES + overflow) });
+    const ann = makeAnnotation({ message: 'x'.repeat(MAX_RENDERED_FIELD_CHARS + overflow) });
     const out = strip(renderAnnotationsList([ann]));
-    expect(out).toContain(`(truncated, ${overflow.toString()} more bytes`);
+    expect(out).toContain(`(truncated, ${overflow.toString()} more characters`);
     // The body itself is exactly the cap; the count of `x` characters should
-    // equal MAX_RENDERED_FIELD_BYTES.
-    expect((out.match(/x/g) ?? []).length).toBe(MAX_RENDERED_FIELD_BYTES);
+    // equal MAX_RENDERED_FIELD_CHARS.
+    expect((out.match(/x/g) ?? []).length).toBe(MAX_RENDERED_FIELD_CHARS);
   });
 
   it('truncates rawDetails when oversized', () => {
     const overflow = 100;
     const ann = makeAnnotation({
-      rawDetails: 'r'.repeat(MAX_RENDERED_FIELD_BYTES + overflow),
+      rawDetails: 'r'.repeat(MAX_RENDERED_FIELD_CHARS + overflow),
     });
     const out = strip(renderAnnotationsList([ann]));
     expect(out).toContain('Raw details:');
-    expect(out).toContain(`(truncated, ${overflow.toString()} more bytes`);
+    expect(out).toContain(`(truncated, ${overflow.toString()} more characters`);
   });
 
   it('does not mark under-cap fields as truncated', () => {
