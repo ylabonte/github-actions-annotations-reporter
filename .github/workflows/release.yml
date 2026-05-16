@@ -47,11 +47,11 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
       # npm 11.5+ is required for trusted-publishing OIDC. Node 22 ships
-      # with npm 10 (matching Node 20 era). Pin to the 11.x major so the
-      # release pipeline doesn't silently start using a future npm major
-      # (12+) that could change the publish flow, OIDC token format, or
-      # pnpm interop mid-release. Bump
-      # the floor here intentionally after validating the next major.
+      # with npm 10.x by default, so we install npm 11 explicitly. Pin to
+      # the 11.x major so the release pipeline doesn't silently start
+      # using a future npm major (12+) that could change the publish flow,
+      # OIDC token format, or pnpm interop mid-release. Bump the floor
+      # here intentionally after validating the next major.
       - run: npm install -g npm@^11
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
