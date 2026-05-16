@@ -21,7 +21,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm run format:check
@@ -42,17 +42,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['20', '22']
-        os: [ubuntu-latest, macos-latest]
-        include:
-          # Windows is documented as supported (see CLAUDE.md "Common pitfalls"
-          # on `path.relative`, `.cmd` shim spawn, etc.) and `src/cli.ts` uses
-          # `pathToFileURL` specifically to keep main-module detection working
-          # there. Run one Windows job so those code paths actually exercise
-          # in CI; without it a future refactor could silently reintroduce a
-          # Windows-specific bug.
-          - node: '20'
-            os: windows-latest
+        node: ['22']
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -71,7 +62,7 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build

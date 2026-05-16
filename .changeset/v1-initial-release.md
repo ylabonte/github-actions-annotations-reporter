@@ -6,7 +6,7 @@ Initial stable release. `github-actions-annotations-reporter` ships as both a Ty
 
 ### What's in the box
 
-- **CLI & Action.** A single `ghaar` binary plus a composite Action wrapper that installs the package on demand and forwards every flag. Node 20+, ESM-strict, pnpm-managed.
+- **CLI & Action.** A single `ghaar` binary plus a composite Action wrapper that installs the package on demand and forwards every flag. Node 22+, ESM-strict, pnpm-managed.
 - **Annotation scanning.** Walks every workflow on the configured branch, picks the latest completed run of each, and collects `notice` / `warning` / `error` annotations. Severity filtering via `--min-severity` and glob include/exclude (`--workflows`, `--reject`).
 - **Stable fingerprinting.** Each annotation is identified by `sha256(workflowPath + annotationPath + normalizedMessage)`. Line numbers are deliberately excluded so a benign refactor that shifts a deprecation from line 10 to line 200 never spawns a fresh issue.
 - **Idempotent issue lifecycle.** Reconciler decides per fingerprint whether to create, update, reopen, suppress, auto-close, or hold. State (last-seen timestamp, miss counter, first-seen timestamp) lives in HTML-comment markers embedded in the issue body — no external datastore.
