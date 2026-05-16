@@ -25,12 +25,14 @@ function renderHelp(cmd: {
   outputHelp: () => void;
 }): string {
   let buf = '';
+  // No restore step is needed afterwards: this script is a one-shot
+  // entrypoint, each `cmd` instance only has its help rendered once, and
+  // commander's `configureOutput({})` does not actually restore the prior
+  // `writeOut` (it merges the partial config rather than resetting), so a
+  // try/finally with `configureOutput({})` would convey "restore" intent
+  // it doesn't fulfill.
   cmd.configureOutput({ writeOut: (s) => (buf += s) });
-  try {
-    cmd.outputHelp();
-  } finally {
-    cmd.configureOutput({});
-  }
+  cmd.outputHelp();
   return buf;
 }
 
