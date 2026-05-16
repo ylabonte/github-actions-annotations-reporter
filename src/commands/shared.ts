@@ -113,12 +113,18 @@ export async function emitResults(args: ReportOutputOptions): Promise<{ jsonPath
   // self-hosted runners that use the CLI directly.
   let jsonPath: string | null = null;
   if (opts.jsonOut) {
-    // Create the parent directory if needed — fs.writeFile would otherwise
-    // fail with a cryptic ENOENT on a missing intermediate component.
-    // `recursive: true` is a no-op when the directory already exists.
-    await fs.mkdir(path.dirname(path.resolve(opts.jsonOut)), { recursive: true });
-    await fs.writeFile(opts.jsonOut, `${JSON.stringify(jsonReport, null, 2)}\n`);
-    jsonPath = path.resolve(opts.jsonOut);
+    // Resolve the path once and use the resolved form for both the mkdir
+    // (parent directory) and the writeFile (target file). Previously the
+    // mkdir resolved the path but the writeFile used the unresolved
+    // (potentially relative) form — benign today because Node resolves
+    // against the same `process.cwd()`, but the asymmetry was easy to
+    // misread and would have broken subtly if any future caller changed
+    // cwd between the two operations. `recursive: true` makes mkdir a
+    // no-op when the directory already exists.
+    const resolved = path.resolve(opts.jsonOut);
+    await fs.mkdir(path.dirname(resolved), { recursive: true });
+    await fs.writeFile(resolved, `${JSON.stringify(jsonReport, null, 2)}\n`);
+    jsonPath = resolved;
   }
 
   if (opts.json) {
