@@ -14,6 +14,8 @@ export interface ProgressReporter {
   succeed(message?: string): void;
   /** Finish the current phase with a failure marker. */
   fail(message?: string): void;
+  /** Emit a one-off informational line independent of any phase. No-op when disabled. */
+  note(message: string): void;
 }
 
 export interface CreateProgressOptions {
@@ -37,6 +39,9 @@ class NoopProgress implements ProgressReporter {
     // intentionally empty
   }
   fail(): void {
+    // intentionally empty
+  }
+  note(): void {
     // intentionally empty
   }
 }
@@ -66,6 +71,18 @@ class OraProgress implements ProgressReporter {
     if (!this.spinner) return;
     this.spinner.fail(message);
     this.spinner = null;
+  }
+
+  note(message: string): void {
+    // If a spinner is active, stop it cleanly first so the note line doesn't
+    // get mangled by the in-place spinner rewrite. Notes are emitted at phase
+    // boundaries in practice (e.g. repo resolution before the first start()),
+    // so this path is rarely hit but cheap to keep.
+    if (this.spinner) {
+      this.spinner.stop();
+      this.spinner = null;
+    }
+    process.stderr.write(`${message}\n`);
   }
 }
 /* c8 ignore stop */
