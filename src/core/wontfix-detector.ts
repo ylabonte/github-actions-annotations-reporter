@@ -97,7 +97,15 @@ function safeCompile(pattern: string): RegExp | null {
  * `.slice()` — the regex test on the bounded prefix is unaffected.
  */
 function clampToCodePointBoundary(s: string, max: number): string {
-  const last = s.codePointAt(max - 1) ?? 0;
+  // Use `charCodeAt`, NOT `codePointAt`: when the index points at a high
+  // surrogate that's part of a valid pair, `codePointAt` returns the
+  // *combined* astral codepoint (e.g. 0x1F600 for 😀), bypassing the
+  // surrogate-range check below. `charCodeAt` always returns the raw
+  // UTF-16 code unit, so the range guard fires correctly. This is the
+  // exact case the function exists to handle, so silencing the unicorn
+  // rule preference here is intentional.
+  // eslint-disable-next-line unicorn/prefer-code-point
+  const last = s.charCodeAt(max - 1);
   const cut = last >= 0xd8_00 && last <= 0xdb_ff ? max - 1 : max;
   return s.slice(0, cut);
 }

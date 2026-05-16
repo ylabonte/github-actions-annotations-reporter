@@ -117,29 +117,24 @@ describe('detectWontfix', () => {
     expect(decision.signal).toBe('comment-pattern');
   });
 
-  it('does not split a surrogate pair when clamping to the comment length cap', async () => {
-    // A supplementary-plane code point (emoji 😀, U+1F600) is two UTF-16
-    // code units. Land the cap exactly inside the pair and verify the
-    // bounded prefix is still a valid string (no unpaired high surrogate).
+  it('clamps on a code-point boundary (surrogate pair straddling the cap)', async () => {
+    // Build a comment where the cap falls exactly on the high surrogate
+    // of an emoji pair. Use a behavior-based assertion: a pattern that
+    // matches "the last char is an 'a'" succeeds only if the clamp
+    // correctly trims the dangling high surrogate, leaving the trailing
+    // 'a' from the padding intact.
+    //
+    // If the implementation regresses and uses `codePointAt` instead of
+    // `charCodeAt` (so the surrogate-range guard misses), the bounded
+    // string ends with U+D83D and the `a$` test fails.
     const padding = 'a'.repeat(MAX_COMMENT_LENGTH - 1);
-    const comment = `${padding}\u{1F600}match`;
-    let observed: string | null = null;
+    const comment = `${padding}\u{1F600}tail`;
     const decision = await detectWontfix({
       issue: makeIssue({ state: 'closed' }),
-      config: { ...baseConfig, commentPattern: '^a+$' },
-      fetchClosingComment: () => {
-        observed = comment;
-        return Promise.resolve(comment);
-      },
+      config: { ...baseConfig, commentPattern: 'a$' },
+      fetchClosingComment: () => Promise.resolve(comment),
     });
-    // The match should fail (needle is past the cap, the trailing high
-    // surrogate is trimmed off), but more importantly the bounded string
-    // must not contain an unpaired surrogate.
-    expect(decision.suppressed).toBe(false);
-    expect(observed).not.toBeNull();
-    // Sanity: JSON-serializing the bounded form should round-trip cleanly.
-    expect(() =>
-      JSON.stringify((observed as unknown as string).slice(0, MAX_COMMENT_LENGTH - 1)),
-    ).not.toThrow();
+    expect(decision.suppressed).toBe(true);
+    expect(decision.signal).toBe('comment-pattern');
   });
 });
