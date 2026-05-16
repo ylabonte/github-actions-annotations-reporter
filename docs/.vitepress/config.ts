@@ -9,12 +9,16 @@ export default defineConfig({
   base: process.env['DOCS_BASE'] ?? `/${REPO}/`,
   cleanUrls: true,
   lastUpdated: true,
-  // esbuild 0.27 refuses to transpile vitepress 1.6's parameter-destructuring patterns to
-  // the default `es2020` target. Bumping the build target to esnext skips the down-level
-  // transform — modern evergreen browsers already support these.
+  // esbuild 0.27 refuses to transpile vitepress 1.6's parameter-destructuring
+  // patterns to the default `es2020` target. `es2022` clears that specific
+  // transform error (parameter destructuring is ES2015 baseline; the actual
+  // blocker is downstream syntax that lands cleanly in ES2022 spec) without
+  // disabling down-leveling for every later ES feature the way `esnext` did.
+  // If a future VitePress / esbuild combination needs more, bump the target
+  // by one minor (es2023, es2024, …) rather than jumping to esnext.
   vite: {
     build: {
-      target: 'esnext',
+      target: 'es2022',
     },
   },
   themeConfig: {
