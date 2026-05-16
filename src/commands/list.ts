@@ -1,12 +1,22 @@
 import pc from 'picocolors';
 import { createOctokit } from '../core/github/client.js';
 import { resolveAuth } from '../core/auth.js';
-import { resolveRepo } from '../core/github/repo.js';
+import { resolveRepo, type ResolveRepoFromGitRemoteOptions } from '../core/github/repo.js';
 import { listManagedIssues } from '../core/github/issues.js';
 import { createProgress } from '../io/progress.js';
 import { prepareRun, shouldShowProgress, type CommonCliOptions } from './shared.js';
 
-export async function runListCommand(opts: CommonCliOptions): Promise<number> {
+export interface RunListCommandOverrides {
+  // Injection point matching RunPipelineOptions.runGit so tests can stub
+  // git-remote resolution and the developer's local .git/origin doesn't
+  // leak into list-command unit tests.
+  readonly runGit?: ResolveRepoFromGitRemoteOptions['runGit'];
+}
+
+export async function runListCommand(
+  opts: CommonCliOptions,
+  overrides: RunListCommandOverrides = {},
+): Promise<number> {
   const prepared = await prepareRun(opts);
   // `?? ''` would technically work (resolveAuth trims and falls through to
   // env on empty), but the explicit-undefined pattern matches the call site
@@ -15,9 +25,11 @@ export async function runListCommand(opts: CommonCliOptions): Promise<number> {
   const auth = await resolveAuth(prepared.token ? { explicitToken: prepared.token } : {});
   const progress = createProgress({ enabled: shouldShowProgress(opts) });
   const repo = await resolveRepo(prepared.repo, {
+    // Always-on audit signal — see the matching comment in src/core/pipeline.ts.
     notify: (msg) => {
-      progress.note(msg);
+      process.stderr.write(`${msg}\n`);
     },
+    ...(overrides.runGit ? { runGit: overrides.runGit } : {}),
   });
   if (!repo) {
     process.stderr.write(
