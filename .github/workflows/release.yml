@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     branches: [main]
+  # Manual re-trigger for the 1.0.0 bootstrap and any future case where the
+  # workflow needs to re-evaluate `main` without a fresh push (e.g. retrying
+  # a publish after npmjs.org trusted-publisher config changes). The job is
+  # idempotent: pending changesets → update Version Packages PR, none → try
+  # publish (no-op if the version is already on the registry).
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -56,13 +62,11 @@ jobs:
           version: pnpm exec changeset version
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          # Temporary: bootstraps the first publish of the package (npm
-          # trusted publishing can only be configured for packages that
-          # already exist on the registry). Revert this line and delete the
-          # NPM_TOKEN repo secret once 1.0.0 is on npm and the trusted
-          # publisher has been configured on npmjs.org. changesets/action
-          # prefers NPM_TOKEN when set and falls back to OIDC otherwise.
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # OIDC trusted publishing only. The first publish (v1.0.0) was made
+          # locally with npm 2FA — the trusted-publisher relationship on
+          # npmjs.org can only be configured once the package exists, so the
+          # very first release cannot run through CI. Every subsequent release
+          # runs here via the OIDC token issued from `permissions.id-token: write`.
           NPM_CONFIG_PROVENANCE: 'true'
 
       # When a publish actually happened, move the floating major-version tag
