@@ -27,7 +27,12 @@ export {
   renderIssueTitle,
   severityLabel,
 } from './io/issue-body.js';
-export { buildJsonReport, type JsonReport, type SerializedAction } from './io/output/json.js';
+export {
+  buildJsonReport,
+  type JsonReport,
+  type SerializedAction,
+  type SerializedAnnotation,
+} from './io/output/json.js';
 export type {
   Annotation,
   AnnotationLevel,
