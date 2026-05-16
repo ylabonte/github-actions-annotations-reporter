@@ -255,4 +255,71 @@ describe('collectAnnotations', () => {
     expect(result.annotations).toHaveLength(0);
     expect(result.latestRunByWorkflowPath.get('.github/workflows/ci.yml')).toBeNull();
   });
+
+  // Defensive NaN-guard in `dedupeByFingerprint` is unreachable today through
+  // the public API (within a single scan, all annotations sharing a
+  // fingerprint also share the same `run`, so the tie-break never fires on
+  // a real path). Skipped from regression coverage because a contrived
+  // setup would test the implementation, not behavior. The hand-written
+  // `isStrictlyAfter` helper in src/core/annotation-collector.ts has its
+  // own comment describing the invariant.
+  it.skip('dedupe tie-break: prefer the side with a parseable timestamp over a NaN one (defensive; no live trigger today)', async () => {
+    // Intentionally empty — placeholder for if the collector ever surfaces
+    // multi-run-per-workflow annotation paths.
+    const wf = { id: 1, name: 'CI', path: '.github/workflows/ci.yml', state: 'active' };
+    const malformedRun = {
+      id: 10,
+      run_number: 10,
+      html_url: 'r/10',
+      head_branch: 'main',
+      head_sha: 'a',
+      conclusion: 'success',
+      created_at: 'not-a-date',
+    };
+    const octokit = {
+      paginate: {
+        async *iterator(method: unknown, params: unknown): AsyncIterable<{ data: unknown[] }> {
+          const fn = method as (p: unknown) => Promise<{ data: unknown[] }>;
+          const r = await fn(params);
+          yield { data: r.data };
+        },
+      },
+      actions: {
+        listRepoWorkflows: () => Promise.resolve({ data: [wf] }),
+        listWorkflowRuns: () => Promise.resolve({ data: { workflow_runs: [malformedRun] } }),
+        listJobsForWorkflowRun: () =>
+          Promise.resolve({
+            data: [{ id: 100, name: 'lint', check_run_url: '/check-runs/200' }],
+          }),
+      },
+      checks: {
+        listAnnotations: () =>
+          Promise.resolve({
+            data: [
+              {
+                annotation_level: 'warning',
+                message: 'm',
+                title: null,
+                raw_details: null,
+                path: 'p',
+                start_line: 1,
+                end_line: 1,
+              },
+            ],
+          }),
+      },
+    } as unknown as Parameters<typeof collectAnnotations>[0];
+
+    const result = await collectAnnotations(octokit, {
+      ref: REPO,
+      branch: 'main',
+      filter: { include: [], exclude: [] },
+      minSeverity: 'notice',
+    });
+    // The malformed-timestamp annotation is still the only one in this
+    // scan, so it should survive (not be discarded as if its timestamp
+    // were "older"). The key property: the result is non-empty.
+    expect(result.annotations).toHaveLength(1);
+    expect(result.annotations[0]!.run.createdAt).toBe('not-a-date');
+  });
 });

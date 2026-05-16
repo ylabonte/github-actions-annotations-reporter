@@ -92,14 +92,28 @@ function dedupeByFingerprint(annotations: readonly Annotation[]): Annotation[] {
     const nextRank = SEVERITY_ORDER[a.severity];
     if (nextRank > prevRank) {
       seen.set(a.fingerprint, a);
-    } else if (
-      nextRank === prevRank &&
-      Date.parse(a.run.createdAt) > Date.parse(prev.run.createdAt)
-    ) {
+    } else if (nextRank === prevRank && isStrictlyAfter(a.run.createdAt, prev.run.createdAt)) {
       seen.set(a.fingerprint, a);
     }
   }
   return [...seen.values()];
+}
+
+/**
+ * Strict `a > b` for ISO-8601 timestamps with explicit NaN handling.
+ * `Date.parse` returns `NaN` for malformed input and every numeric
+ * comparison against `NaN` is `false`, so without this guard a single
+ * malformed timestamp on either side silently keeps the existing
+ * representative regardless of which side has a valid value. We prefer
+ * the side with a parseable timestamp; if both are unparseable we keep
+ * the existing representative (insertion order wins).
+ */
+function isStrictlyAfter(candidate: string, current: string): boolean {
+  const a = Date.parse(candidate);
+  const b = Date.parse(current);
+  if (Number.isNaN(a)) return false;
+  if (Number.isNaN(b)) return true;
+  return a > b;
 }
 
 // Re-export so callers don't need to import from a deeper path.
