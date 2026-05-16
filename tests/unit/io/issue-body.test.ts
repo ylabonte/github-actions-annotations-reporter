@@ -57,6 +57,29 @@ describe('renderIssueBody / parsers', () => {
     ]);
   });
 
+  it('parses occurrences with alternate date/url separators (markdown normalization tolerance)', () => {
+    // The renderer emits an em-dash `—`, but a Markdown linter, a human
+    // editor, or a templating bot can normalize punctuation. Accept the
+    // common variants so a round-trip of a managed issue doesn't lose its
+    // occurrence history.
+    const body = [
+      '### Recent occurrences',
+      '',
+      '- 2026-05-15 — [run #1](https://example/runs/1)',
+      '- 2026-05-14 – [run #2](https://example/runs/2)', // en-dash U+2013
+      '- 2026-05-13 - [run #3](https://example/runs/3)', // hyphen-minus
+      '- 2026-05-12 -- [run #4](https://example/runs/4)', // double hyphen
+      '',
+      '---',
+    ].join('\n');
+    expect(parseOccurrences(body)).toEqual([
+      { date: '2026-05-15', runUrl: 'https://example/runs/1', runNumber: 1 },
+      { date: '2026-05-14', runUrl: 'https://example/runs/2', runNumber: 2 },
+      { date: '2026-05-13', runUrl: 'https://example/runs/3', runNumber: 3 },
+      { date: '2026-05-12', runUrl: 'https://example/runs/4', runNumber: 4 },
+    ]);
+  });
+
   it('parseFingerprintMarker returns null when missing', () => {
     expect(parseFingerprintMarker('no marker here')).toBeNull();
   });

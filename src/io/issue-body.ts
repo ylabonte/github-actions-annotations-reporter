@@ -107,7 +107,14 @@ export function parseOccurrences(body: string): OccurrenceEntry[] {
   const lines = section.split('\n');
   const out: OccurrenceEntry[] = [];
   for (const line of lines) {
-    const m = /^-\s+(\S+)\s+—\s+\[run #(\d+)\]\((\S+)\)/.exec(line);
+    // Accept em-dash (U+2014, what the renderer emits), en-dash (U+2013),
+    // hyphen-minus, double hyphen (--), or three hyphens (---) as the
+    // date/link separator. The renderer agrees with itself today, but the
+    // occurrences section is body prose — a Markdown linter, a human, or
+    // an issue-templating bot can normalize punctuation, and we don't want
+    // a round-trip of a managed issue to silently lose its occurrence
+    // history. Whitespace around the separator is permissive.
+    const m = /^-\s+(\S+)\s+(?:[—–]|-{1,3})\s+\[run #(\d+)\]\((\S+)\)/u.exec(line);
     if (m?.[1] != null && m[2] != null && m[3] != null) {
       out.push({ date: m[1], runNumber: Number.parseInt(m[2], 10), runUrl: m[3] });
     } else if (line.startsWith('---') || line.startsWith('### ')) {
