@@ -54,7 +54,9 @@ export interface RunPipelineResult {
 export async function runPipeline(options: RunPipelineOptions): Promise<RunPipelineResult> {
   const now = options.now ?? new Date();
   const progress = options.progress ?? NOOP_PROGRESS;
-  const auth = await resolveAuth({ explicitToken: options.explicitToken ?? '' });
+  const auth = await resolveAuth(
+    options.explicitToken ? { explicitToken: options.explicitToken } : {},
+  );
 
   const repo = options.explicitRepo ?? resolveRepoFromEnv();
   if (!repo) {

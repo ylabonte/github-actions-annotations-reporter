@@ -8,7 +8,11 @@ import { prepareRun, shouldShowProgress, type CommonCliOptions } from './shared.
 
 export async function runListCommand(opts: CommonCliOptions): Promise<number> {
   const prepared = await prepareRun(opts);
-  const auth = await resolveAuth({ explicitToken: prepared.token ?? '' });
+  // `?? ''` would technically work (resolveAuth trims and falls through to
+  // env on empty), but the explicit-undefined pattern matches the call site
+  // in shared.ts::executePipeline and avoids relying on the trim+truthy
+  // behaviour of resolveAuth's `explicit` branch.
+  const auth = await resolveAuth(prepared.token ? { explicitToken: prepared.token } : {});
   const repo = prepared.repo ?? resolveRepoFromEnv();
   if (!repo) {
     process.stderr.write('Could not resolve repository. Pass --repo owner/name.\n');

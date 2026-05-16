@@ -151,7 +151,7 @@ export async function executePipeline(
   try {
     return await runPipeline({
       config: prepared.config,
-      explicitToken: prepared.token ?? '',
+      ...(prepared.token ? { explicitToken: prepared.token } : {}),
       ...(prepared.repo ? { explicitRepo: prepared.repo } : {}),
       dryRun: Boolean(opts.dryRun),
       applyMode,
