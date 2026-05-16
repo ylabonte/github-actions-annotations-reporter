@@ -14,6 +14,14 @@
   ],
   "license": "MIT",
   "author": "Yannic Labonte",
+  "homepage": "https://ylabonte.github.io/github-actions-annotations-reporter/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ylabonte/github-actions-annotations-reporter.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ylabonte/github-actions-annotations-reporter/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=20.0.0"

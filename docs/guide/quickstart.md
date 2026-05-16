@@ -21,6 +21,24 @@ If you only ever invoke it from GitHub Actions, you don't need to install
 anything — the action wrapper calls `npx` for you. Jump to
 [Use as a GitHub Action](./use-as-action).
 
+## Resolve the target repo
+
+`ghaar` needs to know which `<owner>/<repo>` to scan. It tries three
+sources in order, and the first one that resolves wins:
+
+1. `--repo owner/name` (explicit flag).
+2. `GITHUB_REPOSITORY` env var (set automatically inside GitHub Actions
+   runners).
+3. `git remote get-url origin` from the current working directory.
+
+The third step means that when you run `ghaar` from inside a cloned
+GitHub repo, no flag is needed — the CLI parses the local `origin` URL
+(SSH or HTTPS, with or without credentials) and emits a one-line
+"Resolved repo … from local git remote 'origin'" notice on stderr so you
+can verify the inferred target. Non-GitHub remotes (GitLab, Bitbucket,
+self-hosted GitHub Enterprise Server) are ignored — pass `--repo`
+explicitly for those.
+
 ## Provide a token
 
 `ghaar` reads workflow runs and writes issues, so it needs a GitHub token.
