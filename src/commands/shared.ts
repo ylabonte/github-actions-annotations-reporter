@@ -155,5 +155,12 @@ export async function executePipeline(
 export function shouldShowProgress(opts: CommonCliOptions): boolean {
   if (opts.progress === false) return false;
   if (opts.json) return false;
+  // In the @types/node version this project resolves, `process.stderr.isTTY`
+  // is typed as `boolean`, so direct return satisfies the declared contract
+  // and tsc enforces it. Older / different installations have used
+  // `true | undefined`; if the upstream type ever regresses our typecheck
+  // catches it here, and lint rules (no-unnecessary-{condition,type-
+  // conversion,boolean-literal-compare}) collectively reject every form of
+  // defensive normalization that would silently mask the change.
   return process.stderr.isTTY;
 }
