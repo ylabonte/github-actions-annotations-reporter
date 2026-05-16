@@ -1,4 +1,15 @@
+# pnpm 11+ explicit-allowlist for packages whose install scripts may run.
+# `allowBuilds` replaces the legacy `onlyBuiltDependencies` list. esbuild
+# bundles native binaries via a postinstall, so it has to be permitted
+# explicitly under pnpm 11's "deny by default" model.
 allowBuilds:
   esbuild: true
-onlyBuiltDependencies:
-  - esbuild
+
+# Pin transitive esbuild to a version not affected by the dev-server SSRF
+# advisory GHSA-67mh-4wv8-2f99 (esbuild < 0.25.0). pnpm 11+ reads
+# `overrides` from pnpm-workspace.yaml; the legacy `pnpm.overrides` block
+# in package.json is ignored. Without this entry the lockfile resolves
+# vite@5.4.21's transitive esbuild back to 0.21.5, reintroducing the
+# advisory.
+overrides:
+  esbuild: '>=0.25.0'
