@@ -21,7 +21,7 @@ export interface SerializedAction {
   readonly fingerprint: string;
   readonly issueNumber: number | null;
   readonly reason: string;
-  readonly severity: string | null;
+  readonly severity: Severity | null;
   readonly workflow: string | null;
   readonly job: string | null;
   readonly path: string | null;
