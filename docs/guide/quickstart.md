@@ -40,15 +40,18 @@ export GITHUB_TOKEN="$(gh auth token)"
 See [Authentication](./authentication) for required scopes and Action-only
 notes.
 
-## First scan (dry-run)
+## First scan
 
-The `scan` command never writes anything. It walks your workflows, fetches
-the latest run on the default branch for each one, and prints the action
-plan it _would_ apply:
+The `scan` command never writes anything — it's read-only by design. It
+walks your workflows, fetches the latest run on the default branch for
+each one, and prints the action plan it _would_ apply:
 
 ```bash
-ghaar scan --dry-run
+ghaar scan
 ```
+
+(There's no `--dry-run` on `scan` because it never writes; that flag is
+only meaningful for `report`, where it's the opt-out switch.)
 
 You'll see a table with one row per planned action — `create`, `update`,
 `reopen`, `suppressed`, `auto-close`, `auto-close-hold` — and a summary
@@ -57,7 +60,7 @@ line. The reasoning for each row appears in the `Reason` column.
 If you want the same data in machine-readable form:
 
 ```bash
-ghaar scan --dry-run --json > report.json
+ghaar scan --json > report.json
 ```
 
 The JSON schema is documented in [JSON output](../reference/json-output).
@@ -67,8 +70,8 @@ URL, fingerprint, head SHA, …) — either as fielded blocks on stdout or as
 an `annotations[]` array in the JSON — add `--list-annotations`:
 
 ```bash
-ghaar scan --dry-run --list-annotations
-ghaar scan --dry-run --list-annotations --json > report.json
+ghaar scan --list-annotations
+ghaar scan --list-annotations --json > report.json
 ```
 
 ## Progress indicators
