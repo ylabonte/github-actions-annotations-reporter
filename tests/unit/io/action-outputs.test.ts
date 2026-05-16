@@ -1,4 +1,13 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+// `@actions/core` v3 ships pure ESM with non-configurable exports, so the
+// old `vi.spyOn(core, 'setOutput')` approach throws "Cannot redefine
+// property". The vitest-canonical way is `vi.mock('@actions/core', ...)`
+// with a factory of `vi.fn()` stubs; vitest hoists the mock above the
+// imports so subsequent `import * as core` resolves to the stubs.
+vi.mock('@actions/core', () => ({
+  setOutput: vi.fn(),
+  setFailed: vi.fn(),
+}));
 import * as core from '@actions/core';
 import {
   emitActionOutputs,
@@ -31,20 +40,18 @@ describe('isGitHubActionsEnv', () => {
 });
 
 describe('emitActionOutputs / failAction', () => {
-  let setOutput: ReturnType<typeof vi.spyOn>;
-  let setFailed: ReturnType<typeof vi.spyOn>;
+  const setOutput = vi.mocked(core.setOutput);
+  const setFailed = vi.mocked(core.setFailed);
   const originalEnv = process.env['GITHUB_ACTIONS'];
 
   beforeEach(() => {
-    setOutput = vi.spyOn(core, 'setOutput').mockImplementation(() => undefined);
-    setFailed = vi.spyOn(core, 'setFailed').mockImplementation(() => undefined);
+    setOutput.mockReset();
+    setFailed.mockReset();
   });
 
   afterEach(() => {
     if (originalEnv === undefined) delete process.env['GITHUB_ACTIONS'];
     else process.env['GITHUB_ACTIONS'] = originalEnv;
-    setOutput.mockRestore();
-    setFailed.mockRestore();
   });
 
   it('emits no outputs when not running in GitHub Actions', () => {
@@ -69,9 +76,7 @@ describe('emitActionOutputs / failAction', () => {
     expect(setOutput).toHaveBeenCalledWith('total-annotations', 4);
     expect(setOutput).toHaveBeenCalledWith('json', '/tmp/x.json');
     // Exact-set guard: 9 documented outputs (8 summary counters + json).
-    const emittedKeys = (setOutput.mock.calls as unknown as [string, ...unknown[]][]).map(
-      (c) => c[0],
-    );
+    const emittedKeys = setOutput.mock.calls.map((c) => c[0]);
     expect([...emittedKeys].toSorted()).toEqual(
       [
         'auto-close-held',
@@ -90,7 +95,7 @@ describe('emitActionOutputs / failAction', () => {
   it('skips json output when path is null', () => {
     process.env['GITHUB_ACTIONS'] = 'true';
     emitActionOutputs({ summary, jsonPath: null });
-    const calls = (setOutput.mock.calls as unknown as [string, ...unknown[]][]).map((c) => c[0]);
+    const calls = setOutput.mock.calls.map((c) => c[0]);
     expect(calls).not.toContain('json');
   });
 
