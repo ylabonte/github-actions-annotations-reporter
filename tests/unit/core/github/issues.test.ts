@@ -94,6 +94,33 @@ describe('listManagedIssues', () => {
     const records = await listManagedIssues(octokit, REPO, 'automation/annotation-reporter');
     expect(records).toHaveLength(0);
   });
+
+  it('iterates across multiple pages (per_page=100, more than one page of data)', async () => {
+    // Production code passes `per_page: 100` and relies on
+    // `octokit.paginate.iterator` to walk every page. Seed > 100 issues
+    // so the iterator has to yield multiple pages; assert every record
+    // surfaces in the final result.
+    const state = emptyState();
+    state.issues = Array.from({ length: 250 }, (_, i) => ({
+      number: i + 1,
+      state: 'open' as const,
+      state_reason: null,
+      labels: ['automation/annotation-reporter'],
+      title: `issue #${(i + 1).toString()}`,
+      body: '',
+      html_url: '',
+      closed_at: null,
+      updated_at: '',
+    }));
+    const { octokit } = makeFakeOctokit(state);
+    const records = await listManagedIssues(octokit, REPO, 'automation/annotation-reporter');
+    expect(records).toHaveLength(250);
+    // Sanity: every page contributed (first, mid, last).
+    expect(records[0]!.number).toBe(1);
+    expect(records[99]!.number).toBe(100);
+    expect(records[100]!.number).toBe(101);
+    expect(records[249]!.number).toBe(250);
+  });
 });
 
 describe('createIssue / updateIssue / addIssueComment', () => {

@@ -72,9 +72,27 @@ export function makeFakeOctokit(state: FakeOctokitState): {
 
   const octokit = {
     paginate: {
+      /**
+       * Faithful-ish stand-in for `@octokit/rest`'s `paginate.iterator`:
+       * the real implementation calls the endpoint repeatedly with
+       * incremented `page` parameters until it gets an empty page. Our
+       * mocked endpoints return ALL their data in a single call, so to
+       * exercise the multi-page traversal paths in production code
+       * (`listManagedIssues`, `listJobsForRun`, `listAnnotationsForCheckRun`)
+       * we slice the returned data by the requested `per_page` and yield
+       * the slices as separate pages. Tests that supply more items than
+       * `per_page` therefore actually drive the iteration loop.
+       */
       async *iterator(method: (p: unknown) => Promise<{ data: unknown[] }>, params: unknown) {
         const { data } = await method(params);
-        yield { data };
+        const perPage = readPerPage(params);
+        if (perPage <= 0 || data.length === 0) {
+          yield { data };
+          return;
+        }
+        for (let i = 0; i < data.length; i += perPage) {
+          yield { data: data.slice(i, i + perPage) };
+        }
       },
     },
     repos: {
@@ -174,4 +192,10 @@ export function makeFakeOctokit(state: FakeOctokitState): {
   } as unknown as OctokitInstance;
 
   return { octokit, calls };
+}
+
+function readPerPage(params: unknown): number {
+  if (typeof params !== 'object' || params === null) return 100;
+  const v = (params as Record<string, unknown>)['per_page'];
+  return typeof v === 'number' && v > 0 ? v : 100;
 }
