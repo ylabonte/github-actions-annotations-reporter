@@ -34,6 +34,12 @@ export async function getLatestCompletedRun(
   });
   const run = data.workflow_runs[0];
   if (!run) return null;
+  // The installed Octokit types mark these fields as non-null (only
+  // `head_branch` and `conclusion` are typed as nullable in the Octokit
+  // schema today), so additional nullish-coalescing trips
+  // `@typescript-eslint/no-unnecessary-condition`. If the upstream type
+  // ever broadens (e.g. adds `head_sha: string | null`), tsc will fail
+  // here and we'll add the coalescing back where it's actually needed.
   return {
     id: run.id,
     runNumber: run.run_number,
