@@ -14,17 +14,41 @@ export interface RenderIssueBodyArgs {
 }
 
 export interface OccurrenceEntry {
+  /**
+   * Single-token date string with no internal whitespace (the parser
+   * captures the date via `\S+`). The canonical form is `YYYY-MM-DD`,
+   * which is what the pipeline produces via `now.toISOString().slice(0,
+   * 10)`. If a future caller passes a format with embedded whitespace
+   * (e.g. an ISO-8601 timestamp), the renderer fails fast rather than
+   * producing an entry the parser silently drops on the next round-trip.
+   */
   readonly date: string;
   readonly runUrl: string;
   readonly runNumber: number;
 }
 
+/**
+ * GitHub's issue-title limit is 256 characters; an API call with a longer
+ * title fails the create/update with HTTP 422 and aborts the reconcile
+ * pass for that fingerprint. We aim for a slightly tighter cap (`240`) so
+ * any trailing punctuation (closing bracket, ellipsis) lands safely under
+ * the actual limit even if a future field is added.
+ */
+export const MAX_TITLE_LENGTH = 240;
+const HEAD_LENGTH_BUDGET = 100;
+
 export function renderIssueTitle(annotation: Annotation): string {
   const prefix = `[${severityLabel(annotation.severity)}]`;
   const where = annotation.path ? ` ${annotation.path}` : '';
   const head = annotation.title ?? oneLine(annotation.message);
-  const trimmed = head.length > 100 ? `${head.slice(0, 97)}…` : head;
-  return `${prefix}${where}: ${trimmed}`.trim();
+  const trimmedHead =
+    head.length > HEAD_LENGTH_BUDGET ? `${head.slice(0, HEAD_LENGTH_BUDGET - 3)}…` : head;
+  const assembled = `${prefix}${where}: ${trimmedHead}`.trim();
+  if (assembled.length <= MAX_TITLE_LENGTH) return assembled;
+  // Final assembled-title clamp — `where` (an arbitrary repo-relative path) is
+  // the unbounded contributor; truncate the whole title from the right with
+  // an ellipsis so the result is always API-acceptable.
+  return `${assembled.slice(0, MAX_TITLE_LENGTH - 1)}…`;
 }
 
 export function renderIssueBody(args: RenderIssueBodyArgs): string {
@@ -43,7 +67,17 @@ export function renderIssueBody(args: RenderIssueBodyArgs): string {
       ? '- _(no recorded occurrences yet)_'
       : occurrences
           .slice(0, MAX_OCCURRENCES)
-          .map((o) => `- ${o.date} — [run #${o.runNumber}](${o.runUrl})`)
+          .map((o) => {
+            // The parser captures the date via `\S+`. Whitespace in `o.date`
+            // would silently break the round-trip (the entry is rendered
+            // but never re-parsed). Fail fast at the source instead.
+            if (/\s/.test(o.date)) {
+              throw new TypeError(
+                `OccurrenceEntry.date must not contain whitespace; got ${JSON.stringify(o.date)}`,
+              );
+            }
+            return `- ${o.date} — [run #${o.runNumber.toString()}](${o.runUrl})`;
+          })
           .join('\n');
 
   return [

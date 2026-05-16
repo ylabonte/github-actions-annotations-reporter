@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_TITLE_LENGTH,
   parseFingerprintMarker,
   parseIssueState,
   parseOccurrences,
@@ -107,6 +108,19 @@ describe('renderIssueBody / parsers', () => {
     const annotation = makeAnnotation({ message: 'x'.repeat(300) });
     const title = renderIssueTitle(annotation);
     expect(title.length).toBeLessThan(150);
+    expect(title.endsWith('…')).toBe(true);
+  });
+
+  it('renderIssueTitle clamps the assembled title to the API-safe length', () => {
+    // Long path + long head: head truncates to 100 chars, but path is
+    // unbounded. Without the final-assembled clamp, the result could
+    // exceed GitHub's 256-char limit and the API call would 422. Verify
+    // the assembled title stays at or under MAX_TITLE_LENGTH (240).
+    const longPath = 'deeply/nested/' + 'segment/'.repeat(20) + 'file.ts';
+    const longMessage = 'a'.repeat(150);
+    const annotation = makeAnnotation({ path: longPath, message: longMessage, title: null });
+    const title = renderIssueTitle(annotation);
+    expect(title.length).toBeLessThanOrEqual(MAX_TITLE_LENGTH);
     expect(title.endsWith('…')).toBe(true);
   });
 
