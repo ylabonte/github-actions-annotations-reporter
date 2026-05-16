@@ -62,9 +62,28 @@ export function parseUserConfig(input: unknown): ResolvedConfig {
   });
 }
 
+/**
+ * Per-key partial override shape. `wontfix` and `autoClose` accept any subset
+ * of their fields — callers commonly fill only the ones the user touched
+ * (e.g. `wontfix: { labels }` when only `--wontfix-labels` was passed).
+ * Using `Partial<ResolvedConfig>` here would force callers to construct a
+ * complete sub-object (or `as`-cast a partial one, which is the bug this
+ * type replaces).
+ */
+export interface ConfigOverrides {
+  readonly workflows?: ResolvedConfig['workflows'];
+  readonly reject?: ResolvedConfig['reject'];
+  readonly branch?: ResolvedConfig['branch'];
+  readonly minSeverity?: ResolvedConfig['minSeverity'];
+  readonly managementLabel?: ResolvedConfig['managementLabel'];
+  readonly maxIssues?: ResolvedConfig['maxIssues'];
+  readonly wontfix?: Partial<ResolvedConfig['wontfix']>;
+  readonly autoClose?: Partial<ResolvedConfig['autoClose']>;
+}
+
 export function mergeWithOverrides(
   base: ResolvedConfig,
-  overrides: Partial<ResolvedConfig>,
+  overrides: ConfigOverrides,
 ): ResolvedConfig {
   return ConfigSchema.parse({
     ...base,

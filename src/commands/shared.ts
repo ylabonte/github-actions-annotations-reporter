@@ -1,7 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import os from 'node:os';
-import { loadConfig, mergeWithOverrides, type ResolvedConfig } from '../core/config.js';
+import {
+  loadConfig,
+  mergeWithOverrides,
+  type ConfigOverrides,
+  type ResolvedConfig,
+} from '../core/config.js';
 import { parseRepoSlug } from '../core/github/repo.js';
 import type { RepoRef, Severity } from '../core/types.js';
 import { runPipeline, type RunPipelineResult } from '../core/pipeline.js';
@@ -44,14 +48,7 @@ export interface PreparedRun {
 
 export async function prepareRun(opts: CommonCliOptions): Promise<PreparedRun> {
   const fileConfig = await loadConfig();
-  const overrides: Partial<ResolvedConfig> = {};
-  if (opts.workflows && opts.workflows.length > 0) overrides.workflows = [...opts.workflows];
-  if (opts.reject && opts.reject.length > 0) overrides.reject = [...opts.reject];
-  if (opts.branch) overrides.branch = opts.branch;
-  if (opts.minSeverity) overrides.minSeverity = opts.minSeverity;
-  if (opts.managementLabel) overrides.managementLabel = opts.managementLabel;
-  if (typeof opts.maxIssues === 'number') overrides.maxIssues = opts.maxIssues;
-  overrides.wontfix = {
+  const wontfix: Partial<ResolvedConfig['wontfix']> = {
     ...(opts.wontfixLabels ? { labels: [...opts.wontfixLabels] } : {}),
     ...(typeof opts.wontfixRespectStateReason === 'boolean'
       ? { respectStateReason: opts.wontfixRespectStateReason }
@@ -59,8 +56,8 @@ export async function prepareRun(opts: CommonCliOptions): Promise<PreparedRun> {
     ...(typeof opts.wontfixCommentPattern === 'string'
       ? { commentPattern: opts.wontfixCommentPattern || null }
       : {}),
-  } as ResolvedConfig['wontfix'];
-  overrides.autoClose = {
+  };
+  const autoClose: Partial<ResolvedConfig['autoClose']> = {
     ...(typeof opts.autoClose === 'boolean' ? { enabled: opts.autoClose } : {}),
     ...(typeof opts.autoCloseAfterDays === 'number' ? { afterDays: opts.autoCloseAfterDays } : {}),
     ...(typeof opts.autoCloseAfterMisses === 'number'
@@ -69,7 +66,17 @@ export async function prepareRun(opts: CommonCliOptions): Promise<PreparedRun> {
     ...(typeof opts.autoCloseRequireSuccess === 'boolean'
       ? { requireSuccess: opts.autoCloseRequireSuccess }
       : {}),
-  } as ResolvedConfig['autoClose'];
+  };
+  const overrides: ConfigOverrides = {
+    ...(opts.workflows && opts.workflows.length > 0 ? { workflows: [...opts.workflows] } : {}),
+    ...(opts.reject && opts.reject.length > 0 ? { reject: [...opts.reject] } : {}),
+    ...(opts.branch ? { branch: opts.branch } : {}),
+    ...(opts.minSeverity ? { minSeverity: opts.minSeverity } : {}),
+    ...(opts.managementLabel ? { managementLabel: opts.managementLabel } : {}),
+    ...(typeof opts.maxIssues === 'number' ? { maxIssues: opts.maxIssues } : {}),
+    wontfix,
+    autoClose,
+  };
 
   const config = mergeWithOverrides(fileConfig, overrides);
   const repo = opts.repo ? parseRepoSlug(opts.repo) : undefined;
@@ -85,7 +92,6 @@ export interface ReportOutputOptions {
 export async function emitResults(args: ReportOutputOptions): Promise<{ jsonPath: string | null }> {
   const { opts, result } = args;
   const out = args.stdout ?? process.stdout;
-  const wantJson = Boolean(opts.json) || Boolean(opts.jsonOut);
   const includeAnnotations = Boolean(opts.listAnnotations);
   const jsonReport = buildJsonReport({
     repo: result.repo,
@@ -97,22 +103,22 @@ export async function emitResults(args: ReportOutputOptions): Promise<{ jsonPath
     annotations: result.annotations,
   });
 
+  // Only write a JSON file when the caller explicitly asked for one via
+  // `--json-out`. `--json` alone emits to stdout — that's enough for a
+  // direct CLI consumer, and the action wrapper always passes `--json-out`
+  // anyway (via `mktemp` in the bash dispatcher), so the action's `json`
+  // output keeps working. Previously, `--json` alone wrote a stray file
+  // under `RUNNER_TEMP`/`os.tmpdir()` with no cleanup — invisible on
+  // GitHub-hosted runners (per-job wipe) but accumulating indefinitely on
+  // self-hosted runners that use the CLI directly.
   let jsonPath: string | null = null;
-  if (wantJson) {
-    if (opts.jsonOut) {
-      // Create the parent directory if needed — fs.writeFile would otherwise
-      // fail with a cryptic ENOENT on a missing intermediate component.
-      // `recursive: true` is a no-op when the directory already exists.
-      await fs.mkdir(path.dirname(path.resolve(opts.jsonOut)), { recursive: true });
-      await fs.writeFile(opts.jsonOut, `${JSON.stringify(jsonReport, null, 2)}\n`);
-      jsonPath = path.resolve(opts.jsonOut);
-    } else {
-      jsonPath = path.join(
-        process.env['RUNNER_TEMP'] ?? os.tmpdir(),
-        `ghaar-${Date.now().toString()}.json`,
-      );
-      await fs.writeFile(jsonPath, `${JSON.stringify(jsonReport, null, 2)}\n`);
-    }
+  if (opts.jsonOut) {
+    // Create the parent directory if needed — fs.writeFile would otherwise
+    // fail with a cryptic ENOENT on a missing intermediate component.
+    // `recursive: true` is a no-op when the directory already exists.
+    await fs.mkdir(path.dirname(path.resolve(opts.jsonOut)), { recursive: true });
+    await fs.writeFile(opts.jsonOut, `${JSON.stringify(jsonReport, null, 2)}\n`);
+    jsonPath = path.resolve(opts.jsonOut);
   }
 
   if (opts.json) {
