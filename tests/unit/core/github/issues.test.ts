@@ -192,7 +192,11 @@ describe('getClosingComment', () => {
     expect(await getClosingComment(octokit, REPO, 6)).toBe('final word');
   });
 
-  it('falls back to any comment when closed_by is unknown', async () => {
+  it('fails closed (returns null) when closed_by is unknown (security: no attacker-planted comment match)', async () => {
+    // Before: any comment ≤ closed_at was accepted as the closing voice when
+    // closed_by was missing — letting an unrelated actor's comment satisfy a
+    // wontfix-comment-pattern check on a deleted-actor / App-closed issue.
+    // After: null closer → no closing-comment match, no suppression.
     const state = emptyState();
     state.issues = [
       {
@@ -211,6 +215,6 @@ describe('getClosingComment', () => {
       },
     ];
     const { octokit } = makeFakeOctokit(state);
-    expect(await getClosingComment(octokit, REPO, 7)).toBe('noise');
+    expect(await getClosingComment(octokit, REPO, 7)).toBeNull();
   });
 });

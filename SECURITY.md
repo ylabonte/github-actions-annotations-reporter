@@ -57,6 +57,16 @@ beyond what's implied by running the CLI locally. Concretely:
   highest-risk surface — it's compiled from user config and run against
   arbitrary issue comments. Patterns that hang the runner or burn
   excessive CPU on a crafted comment are in scope.
+- **Wontfix-comment-pattern spoofing via unknown closer.** When an issue
+  was closed by an actor whose account is no longer known (deleted user,
+  API-driven closure without an `actor` populated), an attacker with
+  comment-write access on the issue could otherwise plant text matching
+  a configured `wontfix-comment-pattern` and silently suppress future
+  filings of the same annotation. The detector mitigates this by failing
+  closed — `getClosingComment` returns `null` when the closer is unknown,
+  so the wontfix detector falls back to label / `state_reason` signals
+  only on those issues. A regression that re-opens the "any commenter
+  before close" fallback would be in scope.
 - **Composite-action input bypass.** The `action.yml` `version` input
   is allowlisted to dist-tag / semver shapes; an input that escapes
   the allowlist and reaches `npx` is in scope.

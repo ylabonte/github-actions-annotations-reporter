@@ -139,6 +139,16 @@ export async function getClosingComment(
   });
   if (!issue.closed_at) return null;
   const closer = issue.closed_by?.login ?? null;
+  // Fail closed when we don't know the closer's identity (deleted account,
+  // API-driven closure without an actor populated, etc.). The "any comment
+  // ≤ closed_at" fallback would otherwise accept a comment by ANY actor as
+  // the closing voice — and the wontfix-comment-pattern check above this
+  // function relies on the returned body. An attacker with comment-write
+  // access could plant text matching a configured wontfix regex on an
+  // App-closed issue to suppress future filings. Returning null here means
+  // the wontfix detector falls back to label / state_reason signals only.
+  // See SECURITY.md for the related threat-model entry.
+  if (closer === null) return null;
   const closedAtMs = Date.parse(issue.closed_at);
   let latest: { createdAt: number; body: string } | null = null;
   for await (const { data } of octokit.paginate.iterator(octokit.issues.listComments, {
@@ -149,13 +159,12 @@ export async function getClosingComment(
   })) {
     for (const c of data) {
       const created = Date.parse(c.created_at);
-      // Comment must precede the close (with a 30s grace) and, if we know the closer,
-      // must be authored by them. Either matched comment is acceptable as the closing
-      // statement — the "last one wins" rule keeps the choice stable when there are
-      // multiple candidate comments.
+      // Comment must precede the close (with a 30s grace) AND be authored
+      // by the known closer. The "last one wins" rule keeps the choice
+      // stable when there are multiple candidate comments.
       if (Number.isNaN(created)) continue;
       if (created > closedAtMs + 30_000) continue;
-      if (closer && c.user?.login && c.user.login !== closer) continue;
+      if (c.user?.login !== closer) continue;
       if (!latest || created > latest.createdAt) {
         latest = { createdAt: created, body: c.body ?? '' };
       }
