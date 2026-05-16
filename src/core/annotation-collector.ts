@@ -115,7 +115,3 @@ function isStrictlyAfter(candidate: string, current: string): boolean {
   if (Number.isNaN(b)) return true;
   return a > b;
 }
-
-// Re-export so callers don't need to import from a deeper path.
-
-export { type WorkflowInfo } from './types.js';
