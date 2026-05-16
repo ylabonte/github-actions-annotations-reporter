@@ -73,12 +73,13 @@ The package installs a single binary, `ghaar`. The npm package name
 work with `npx`; the short form is used throughout the docs.
 
 ```sh
-# Install globally, then run
+# Run ephemerally with npx
+npx github-actions-annotations-reporter scan --dry-run
+
+# Or install globally, then run `ghaar`
+# (you may need a fresh shell, or your npm global bin directory on PATH)
 npm install -g github-actions-annotations-reporter
 ghaar scan --dry-run
-
-# Or run ephemerally with npx
-npx github-actions-annotations-reporter scan --dry-run
 ```
 
 Repository and auth are resolved automatically when invoked from inside a
