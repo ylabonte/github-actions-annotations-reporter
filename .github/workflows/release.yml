@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write # required for npm trusted publishing (OIDC)
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    steps:
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      # Pass the App token to checkout so the credential persisted into git
+      # config is the App's, not the default GITHUB_TOKEN. `git push` from
+      # changesets/action (and from later steps in this job) is then
+      # App-authored, which triggers downstream workflows. Setting env
+      # GITHUB_TOKEN alone is not enough — checkout's persisted credential is
+      # what `git push` actually uses.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      # npm 11.5+ is required for trusted-publishing OIDC. Node 20 ships
+      # with npm 10. Pin to the 11.x major so the release pipeline doesn't
+      # silently start using a future npm major (12+) that could change the
+      # publish flow, OIDC token format, or pnpm interop mid-release. Bump
+      # the floor here intentionally after validating the next major.
+      - run: npm install -g npm@^11
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Create release PR or publish
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          publish: pnpm release
+          version: pnpm exec changeset version
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Temporary: bootstraps the first publish of the package (npm
+          # trusted publishing can only be configured for packages that
+          # already exist on the registry). Revert this line and delete the
+          # NPM_TOKEN repo secret once 1.0.0 is on npm and the trusted
+          # publisher has been configured on npmjs.org. changesets/action
+          # prefers NPM_TOKEN when set and falls back to OIDC otherwise.
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # When a publish actually happened, move the floating major-version tag
+      # (e.g. v1 → the just-released v1.x.y) so users can do
+      # `uses: ylabonte/github-actions-annotations-reporter@v1`. Exact-version tags
+      # (v1.2.3) are already created by changesets — this step only adds/moves the
+      # floating one. The major number is read from our own package.json, so there's no
+      # injection surface; the tag-push uses git's own argv splitting.
+      #
+      # We use `--force-with-lease` instead of `--force` so that if a concurrent run
+      # (e.g. a hotfix release on the same major) has already moved the tag, this push
+      # is rejected instead of silently clobbering it. The expected-remote ref is fetched
+      # via `git ls-remote` immediately before the push to give --force-with-lease the
+      # tightest possible expectation (defaults to "tag did not exist", which would always
+      # fail once the tag is in place).
+      #
+      # NOTE FOR CONSUMERS: pinning `@v1` opts into receiving every v1.x.y patch and minor
+      # automatically. For reproducible builds, pin an exact version (`@v1.2.3`) or a full
+      # commit SHA (`@<sha>`) — see docs/guide/use-as-action.md.
+      - name: Update floating v<major> tag
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          major="v${version%%.*}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -f "$major"
+          # Capture the remote's current sha for $major (empty if the tag is new) to
+          # supply as the expected-value to --force-with-lease. An empty string means
+          # "expect the ref not to exist" and falls through to a normal push.
+          expected="$(git ls-remote origin "refs/tags/$major" | awk '{print $1}')"
+          if [ -n "$expected" ]; then
+            git push origin "$major" --force-with-lease="refs/tags/$major:$expected"
+          else
+            git push origin "$major"
+          fi

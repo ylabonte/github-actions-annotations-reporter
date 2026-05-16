@@ -1,0 +1,36 @@
+name: Self-check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 8 * * 1'
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  ghaar:
+    name: Run ghaar against this repo (scan, dry-run)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: ghaar scan --json --dry-run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          node dist/cli.js scan --json --dry-run > ghaar.json
+          code=$?
+          cat ghaar.json
+          if [ "$code" -ne 0 ]; then exit "$code"; fi
