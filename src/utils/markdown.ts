@@ -18,9 +18,7 @@
  * preserved.
  */
 export function escapeHtmlCommentBody(input: string): string {
-  return input.replaceAll(/--+/g, (run) =>
-    Array.from({ length: run.length }, () => '-').join('​'),
-  );
+  return input.replaceAll(/--+/g, (run) => Array.from({ length: run.length }, () => '-').join('​'));
 }
 
 export function blockQuote(input: string): string {
