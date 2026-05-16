@@ -246,7 +246,7 @@ describe('runPipeline — create / update / auto-close', () => {
     // resolveRepoFromEnv() succeed and short-circuit the throw. Clear it
     // (and GH_TOKEN / GITHUB_TOKEN, which the auth chain would otherwise
     // read) so the test exercises the "no repo" branch on every host.
-    // Inject a no-op `runGit` so the dev's local .git/origin doesn't either.
+    // Inject a no-op `runGit` so the dev's local `.git/` origin doesn't leak in either.
     vi.stubEnv('GITHUB_REPOSITORY', '');
     vi.stubEnv('GH_TOKEN', '');
     vi.stubEnv('GITHUB_TOKEN', '');
