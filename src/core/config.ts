@@ -57,9 +57,28 @@ export function parseUserConfig(input: unknown): ResolvedConfig {
   const obj = (input ?? {}) as Record<string, unknown>;
   return ConfigSchema.parse({
     ...obj,
-    wontfix: obj['wontfix'] ?? {},
-    autoClose: obj['autoClose'] ?? {},
+    wontfix: normalizeNestedBlock(obj['wontfix'], 'wontfix'),
+    autoClose: normalizeNestedBlock(obj['autoClose'], 'autoClose'),
   });
+}
+
+/**
+ * Permissive nullish handling for nested config blocks. `null` / `undefined`
+ * become `{}` so zod's per-field defaults fire; any other non-object value
+ * (`wontfix: false`, `autoClose: 42`, an array, etc.) raises an explicit error
+ * that names the offending field, instead of relying on zod's later
+ * "Expected object" failure that points at the input root.
+ */
+function normalizeNestedBlock(value: unknown, fieldName: string): Record<string, unknown> {
+  if (value == null) return {};
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  throw new TypeError(
+    `Config field "${fieldName}" must be an object (or null), got ${
+      Array.isArray(value) ? 'array' : typeof value
+    }.`,
+  );
 }
 
 /**

@@ -31,6 +31,18 @@ describe('parseUserConfig', () => {
   it('rejects invalid severity', () => {
     expect(() => parseUserConfig({ minSeverity: 'lol' })).toThrow();
   });
+
+  it('treats null/undefined nested blocks as empty (zod defaults fire)', () => {
+    const cfg = parseUserConfig({ wontfix: null, autoClose: undefined });
+    expect(cfg.wontfix.labels).toEqual(['wontfix']);
+    expect(cfg.autoClose.enabled).toBe(true);
+  });
+
+  it('raises an explicit, field-named error for non-object nested blocks', () => {
+    expect(() => parseUserConfig({ wontfix: false })).toThrow(/wontfix/);
+    expect(() => parseUserConfig({ autoClose: 42 })).toThrow(/autoClose/);
+    expect(() => parseUserConfig({ wontfix: ['oops'] })).toThrow(/wontfix.*array/i);
+  });
 });
 
 describe('mergeWithOverrides', () => {
