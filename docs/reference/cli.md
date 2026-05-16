@@ -3,6 +3,18 @@
 The `ghaar` CLI is the same binary used by the composite GitHub Action. It takes
 the same flags whether invoked directly or via the action wrapper.
 
+## Exit codes
+
+| Code | When                                                                                                                                                    |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | The pipeline ran. By default, finding / filing / updating issues exits 0.                                                                               |
+| `1`  | A runtime error: auth failure, repo resolution failure, GitHub API failure, unhandled exception.                                                        |
+| `2`  | `--fail-on-new` was passed and the run created at least one new issue. Use this in PR gates to distinguish "new noise to triage" from "pipeline broke". |
+
+Shell pipelines branching on the code can rely on the contract above; the values are defined as named constants in `src/commands/exit-codes.ts`.
+
+## Generated flag reference
+
 The block below is regenerated from the live commander definition by
 `pnpm docs:gen-cli`. **Do not edit it by hand** — your changes will be
 overwritten on the next regeneration. To change the help text, edit
@@ -109,8 +121,9 @@ Options:
   --list-annotations                 Print every found annotation with full
                                      detail (also adds `annotations[]` to the
                                      JSON report)
-  --fail-on-new                      Exit non-zero if any new issues were
-                                     created
+  --fail-on-new                      Exit with code 2 if any new issues were
+                                     created (distinct from code 1 for runtime
+                                     errors)
   -h, --help                         display help for command
 ```
 

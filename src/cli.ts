@@ -43,7 +43,10 @@ export function buildProgram(): Command {
           '--list-annotations',
           'Print every found annotation with full detail (also adds `annotations[]` to the JSON report)',
         )
-        .option('--fail-on-new', 'Exit non-zero if any new issues were created')
+        .option(
+          '--fail-on-new',
+          'Exit with code 2 if any new issues were created (distinct from code 1 for runtime errors)',
+        )
         .action(async (_args, cmd) => {
           process.exitCode = await runReportCommand(normalize(cmd));
         }),
