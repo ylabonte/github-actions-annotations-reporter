@@ -27,10 +27,10 @@ export function resolveRepoFromEnv(env: NodeJS.ProcessEnv = process.env): RepoRe
 const GITHUB_REMOTE_PATTERNS = [
   // git@github.com:owner/repo[.git]
   /^git@github\.com:([^/\s]+)\/([^/\s]+?)(?:\.git)?$/,
-  // ssh://[user@]github.com[:port]/owner/repo[.git]
-  /^ssh:\/\/(?:[^@/]+@)?github\.com(?::\d+)?\/([^/\s]+)\/([^/\s]+?)(?:\.git)?$/,
-  // https://[creds@]github.com/owner/repo[.git]
-  /^https?:\/\/(?:[^@/]+@)?github\.com\/([^/\s]+)\/([^/\s]+?)(?:\.git)?$/,
+  // [git+]ssh://[user@]github.com[:port]/owner/repo[.git]
+  /^(?:git\+)?ssh:\/\/(?:[^@/]+@)?github\.com(?::\d+)?\/([^/\s]+)\/([^/\s]+?)(?:\.git)?$/,
+  // [git+]https://[creds@]github.com/owner/repo[.git]
+  /^(?:git\+)?https?:\/\/(?:[^@/]+@)?github\.com\/([^/\s]+)\/([^/\s]+?)(?:\.git)?$/,
 ] as const;
 
 export function parseGitHubRemoteUrl(url: string): RepoRef | null {
