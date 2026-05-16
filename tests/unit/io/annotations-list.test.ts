@@ -111,4 +111,29 @@ describe('renderAnnotationsList', () => {
     const out = strip(renderAnnotationsList([ann]));
     expect(out).not.toContain('truncated');
   });
+
+  it('truncates on a code-point boundary (surrogate pair straddling the cap)', () => {
+    // Build a message where MAX_RENDERED_FIELD_CHARS-1 falls on the high
+    // surrogate of an emoji pair. The clamp must back off by one and
+    // leave a valid string (no unpaired high surrogate at the tail).
+    const padding = 'a'.repeat(MAX_RENDERED_FIELD_CHARS - 1);
+    const ann = makeAnnotation({ message: `${padding}\u{1F600}tail` });
+    const out = strip(renderAnnotationsList([ann]));
+    expect(out).toContain('truncated');
+    // The rendered body should end on the last 'a' (the surrogate pair is
+    // trimmed off the boundary), not on a lone high surrogate. Detect by
+    // ensuring no isolated high surrogate (U+D800..U+DBFF) appears without
+    // a following low surrogate. Raw UTF-16 reads via charCodeAt are
+    // intentional here — codePointAt would mask the very thing we're
+    // checking.
+    /* eslint-disable unicorn/prefer-code-point -- raw UTF-16 inspection */
+    for (let i = 0; i < out.length; i += 1) {
+      const code = out.charCodeAt(i);
+      if (code >= 0xd8_00 && code <= 0xdb_ff) {
+        const next = out.charCodeAt(i + 1);
+        expect(next >= 0xdc_00 && next <= 0xdf_ff).toBe(true);
+      }
+    }
+    /* eslint-enable unicorn/prefer-code-point */
+  });
 });

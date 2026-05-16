@@ -1,4 +1,5 @@
 import type { IssueRecord } from './types.js';
+import { clampToCodePointBoundary } from '../utils/clamp-code-point.js';
 
 /**
  * Caps on user-supplied regex inputs. Both surfaces are reachable from
@@ -111,25 +112,4 @@ function safeCompile(pattern: string): RegExp | null {
   } catch {
     return null;
   }
-}
-
-/**
- * Slice `s` to at most `max` UTF-16 code units, backing off by one if the cut
- * would land between a high and low surrogate. Prevents an unpaired surrogate
- * from leaking out of the bounded string into downstream consumers (e.g. JSON
- * serialization). The trimmed-by-one case is the only deviation from a raw
- * `.slice()` — the regex test on the bounded prefix is unaffected.
- */
-function clampToCodePointBoundary(s: string, max: number): string {
-  // Use `charCodeAt`, NOT `codePointAt`: when the index points at a high
-  // surrogate that's part of a valid pair, `codePointAt` returns the
-  // *combined* astral codepoint (e.g. 0x1F600 for 😀), bypassing the
-  // surrogate-range check below. `charCodeAt` always returns the raw
-  // UTF-16 code unit, so the range guard fires correctly. This is the
-  // exact case the function exists to handle, so silencing the unicorn
-  // rule preference here is intentional.
-  // eslint-disable-next-line unicorn/prefer-code-point
-  const last = s.charCodeAt(max - 1);
-  const cut = last >= 0xd8_00 && last <= 0xdb_ff ? max - 1 : max;
-  return s.slice(0, cut);
 }

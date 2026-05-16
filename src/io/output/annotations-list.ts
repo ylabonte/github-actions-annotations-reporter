@@ -1,5 +1,6 @@
 import pc from 'picocolors';
 import type { Annotation } from '../../core/types.js';
+import { clampToCodePointBoundary } from '../../utils/clamp-code-point.js';
 import { colorSeverity } from './formatter.js';
 
 const NONE = '(none)';
@@ -78,7 +79,12 @@ interface Truncated {
 
 function truncate(text: string, max: number): Truncated {
   if (text.length <= max) return { body: text, truncated: false, elidedChars: 0 };
-  return { body: text.slice(0, max), truncated: true, elidedChars: text.length - max };
+  // Use the shared code-point-boundary clamp so a cap landing inside a
+  // surrogate pair doesn't leak an unpaired high surrogate into the
+  // terminal (where many emulators replace it with U+FFFD). Same helper
+  // is used by `wontfix-detector::detectWontfix` — keep them in sync.
+  const body = clampToCodePointBoundary(text, max);
+  return { body, truncated: true, elidedChars: text.length - body.length };
 }
 
 function truncationMarker(elidedChars: number): string {
