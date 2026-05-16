@@ -102,7 +102,10 @@ describe('listAnnotationsForCheckRun', () => {
     });
     const annotations = await listAnnotationsForCheckRun(octokit, REPO, 1);
     expect(annotations[0]!.level).toBe('warning');
-    expect(annotations[1]!.level).toBe('notice');
+    // `annotation_level: null` is an unrecognized value → falls into the
+    // fail-safe-ish default ('warning'). See normalizeLevel comment in
+    // src/core/github/annotations.ts.
+    expect(annotations[1]!.level).toBe('warning');
     expect(annotations[1]!.message).toBe('');
     expect(annotations[1]!.path).toBe('');
   });
@@ -142,6 +145,9 @@ describe('listAnnotationsForCheckRun', () => {
       ],
     });
     const annotations = await listAnnotationsForCheckRun(octokit, REPO, 1);
-    expect(annotations.map((a) => a.level)).toEqual(['notice', 'failure', 'notice']);
+    // Unknown / unrecognized levels now default to 'warning' (was previously
+    // 'notice', a silent downgrade that could let a future API value sneak
+    // past --min-severity warning filters).
+    expect(annotations.map((a) => a.level)).toEqual(['notice', 'failure', 'warning']);
   });
 });

@@ -58,9 +58,18 @@ export async function listAnnotationsForCheckRun(
   return results;
 }
 
+/**
+ * Coerce the GitHub Annotations API `annotation_level` field into the
+ * domain enum. Unknown values default to `'warning'` rather than `'notice'`:
+ * the previous fail-open `'notice'` default could silently downgrade a
+ * future API value (e.g. a hypothetical `'critical'` or `'fatal'`) and
+ * sneak it past `--min-severity warning` filters. `'warning'` is a
+ * deliberate middle ground — surfaces the unknown level instead of
+ * suppressing it, without claiming it's an error.
+ */
 function normalizeLevel(level: string | null | undefined): AnnotationLevel {
   if (level === 'notice' || level === 'warning' || level === 'failure') return level;
-  return 'notice';
+  return 'warning';
 }
 
 function extractCheckRunId(checkRunUrl: string | null | undefined): number | null {
