@@ -61,18 +61,25 @@ export function evaluateAutoClose(args: EvaluateAutoCloseArgs): AutoCloseDecisio
 
   const missesOk = newMissCounter >= config.afterMisses;
   const ageOk = ageDays >= config.afterDays;
+  // When `parsedState?.lastSeenAt` is missing, ageDays is +Infinity by design
+  // (treat missing state as "infinitely old"). The sentinel makes the math
+  // work but reads badly in a closing comment / JSON `reason` field
+  // (`Infinity days`), so substitute a human-readable token when formatting.
+  const ageDisplay = Number.isFinite(ageDays)
+    ? `${ageDays.toFixed(1)} days`
+    : 'an unknown number of days (no last-seen marker)';
 
   if (missesOk && ageOk) {
     return {
       kind: 'close',
       newMissCounter,
-      reason: `absent for ${newMissCounter.toString()} consecutive scans and ${ageDays.toFixed(1)} days`,
+      reason: `absent for ${newMissCounter.toString()} consecutive scans and ${ageDisplay}`,
     };
   }
   return {
     kind: 'hold',
     newMissCounter,
-    reason: `holding (misses=${newMissCounter.toString()}/${config.afterMisses.toString()}, ageDays=${ageDays.toFixed(1)}/${config.afterDays.toString()})`,
+    reason: `holding (misses=${newMissCounter.toString()}/${config.afterMisses.toString()}, age=${ageDisplay}/${config.afterDays.toString()} days)`,
   };
 }
 
