@@ -27,6 +27,14 @@ jobs:
       - run: pnpm run format:check
       - run: pnpm run lint
       - run: pnpm run typecheck
+      - name: Verify docs/reference/cli.md is up to date
+        # CONTRIBUTING.md asks contributors to run `pnpm docs:gen-cli` after
+        # editing src/cli.ts and commit the regenerated file. Catch misses
+        # by regenerating in CI and failing on any diff — the foot-gun was
+        # documented for too long without a guardrail.
+        run: |
+          pnpm run docs:gen-cli
+          git diff --exit-code docs/reference/cli.md
 
   test:
     name: Tests (Node ${{ matrix.node }}, ${{ matrix.os }})
@@ -36,6 +44,15 @@ jobs:
       matrix:
         node: ['20', '22']
         os: [ubuntu-latest, macos-latest]
+        include:
+          # Windows is documented as supported (see CLAUDE.md "Common pitfalls"
+          # on `path.relative`, `.cmd` shim spawn, etc.) and `src/cli.ts` uses
+          # `pathToFileURL` specifically to keep main-module detection working
+          # there. Run one Windows job so those code paths actually exercise
+          # in CI; without it a future refactor could silently reintroduce a
+          # Windows-specific bug.
+          - node: '20'
+            os: windows-latest
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
