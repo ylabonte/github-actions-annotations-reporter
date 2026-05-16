@@ -80,10 +80,34 @@ export async function detectWontfix(options: DetectWontfixOptions): Promise<Wont
   return { suppressed: false, signal: null, detail: 'no suppression signal matched' };
 }
 
+/**
+ * Translate a leading PCRE/Perl-style `(?<flags>)` group at the start of
+ * a pattern into JavaScript `RegExp` flags. JS does not accept this inline
+ * syntax (it's a SyntaxError), but users coming from grep/Perl/Ruby/Python
+ * write it intuitively. Supports any combination of `imsuy`; everything
+ * after the closing `)` becomes the pattern body.
+ *
+ * Examples:
+ *   `(?i)wontfix` → /wontfix/i
+ *   `(?im)^x$`   → /^x$/im
+ *   `^x$`        → /^x$/   (unchanged)
+ */
+function parseInlineFlags(pattern: string): { body: string; flags: string } {
+  const m = /^\(\?([imsuy]+)\)/.exec(pattern);
+  if (m?.[1] === undefined) return { body: pattern, flags: '' };
+  // Deduplicate the flag chars while preserving order. `match` returns a
+  // string of ASCII flag chars (`imsuy`), so iterating via `for-of` is
+  // safe (each codepoint is a single code unit).
+  const seen = new Set<string>();
+  for (const ch of m[1]) seen.add(ch);
+  return { body: pattern.slice(m[0].length), flags: [...seen].join('') };
+}
+
 function safeCompile(pattern: string): RegExp | null {
   if (pattern.length > MAX_PATTERN_LENGTH) return null;
+  const { body, flags } = parseInlineFlags(pattern);
   try {
-    return new RegExp(pattern);
+    return new RegExp(body, flags);
   } catch {
     return null;
   }

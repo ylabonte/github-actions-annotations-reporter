@@ -77,6 +77,11 @@ The detector fetches the issue's timeline once and picks the last
 comment authored by the closer at or before `closed_at`. Invalid
 regexes are treated as non-matches (fail-safe).
 
+A leading PCRE-style inline-flag group is translated into JavaScript
+`RegExp` flags. So you can write `(?i)wontfix` for a case-insensitive
+match instead of expanding to `[Ww][Oo][Nn][Tt][Ff][Ii][Xx]`. The
+supported flag characters are `i`, `m`, `s`, `u`, `y`.
+
 ## Re-opening when an annotation returns
 
 A previously-closed issue without any suppression signal is **reopened**

@@ -137,4 +137,29 @@ describe('detectWontfix', () => {
     expect(decision.suppressed).toBe(true);
     expect(decision.signal).toBe('comment-pattern');
   });
+
+  it('honors leading PCRE-style `(?i)` inline flag (translated to JS RegExp flags)', async () => {
+    // The previous behaviour: `new RegExp('(?i)wontfix')` throws a JS
+    // SyntaxError → safeCompile returns null → suppression silently never
+    // matches. Docs examples that used this syntax were dead code. Now
+    // the inline-flag prefix is parsed and translated.
+    const decision = await detectWontfix({
+      issue: makeIssue({ state: 'closed' }),
+      config: { ...baseConfig, commentPattern: '(?i)WONTFIX' },
+      fetchClosingComment: vi.fn().mockResolvedValue('I marked this wontfix yesterday.'),
+    });
+    expect(decision.suppressed).toBe(true);
+    expect(decision.signal).toBe('comment-pattern');
+  });
+
+  it('translates a multi-flag (?im) prefix correctly', async () => {
+    // `i` makes the match case-insensitive; `m` makes `^` and `$` match per-line.
+    // Without `m`, this pattern wouldn't match a line-internal "WONTFIX".
+    const decision = await detectWontfix({
+      issue: makeIssue({ state: 'closed' }),
+      config: { ...baseConfig, commentPattern: '(?im)^wontfix$' },
+      fetchClosingComment: vi.fn().mockResolvedValue('Discussion above.\nWONTFIX\nthanks'),
+    });
+    expect(decision.suppressed).toBe(true);
+  });
 });
