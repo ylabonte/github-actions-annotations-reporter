@@ -132,7 +132,12 @@ describe('renderIssueBody / parsers', () => {
       state: makeIssueState(),
       occurrences: [],
     });
-    expect(body).not.toMatch(/^>\s*before -->/m);
-    expect(body).toMatch(/before -- > after/);
+    // The unescaped `-->` must not survive in the rendered body — any literal
+    // `-->` here would let GitHub's HTML-comment parser close our state
+    // marker prematurely. After escapeHtmlCommentBody, the `--` is split by
+    // a zero-width space (U+200B), so a raw `-->` substring no longer exists.
+    expect(body).not.toContain('before --> after');
+    const zwsp = String.fromCodePoint(0x20_0b);
+    expect(body).toContain(`before -${zwsp}-> after`);
   });
 });
