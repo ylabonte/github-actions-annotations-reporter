@@ -28,6 +28,10 @@ Glob syntax is intentionally minimal: `*` matches any non-slash run,
 `**` matches across slashes, `?` matches a single non-slash character.
 No braces, no character classes — keep your patterns readable.
 
+**Case-insensitive.** `--workflows ci` matches a workflow named `CI`,
+`Ci`, or `CI.yml`. The match is lenient on purpose: workflow display
+names are human input and rarely typed with the exact API casing.
+
 ## `reject` — exclude matching
 
 Same matching rules, but the workflow drops out of the scan when **any**

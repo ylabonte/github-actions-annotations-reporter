@@ -57,4 +57,18 @@ describe('workflowMatchesFilter', () => {
       false,
     );
   });
+
+  it('matches workflow names case-insensitively', () => {
+    // A user typing `--workflows ci` (lowercase) reasonably expects to match
+    // a workflow named `CI`. Verify each casing variant resolves.
+    expect(workflowMatchesFilter('CI', '.github/workflows/CI.yml', filter(['ci']))).toBe(true);
+    expect(workflowMatchesFilter('CI', '.github/workflows/CI.yml', filter(['Ci']))).toBe(true);
+    expect(
+      workflowMatchesFilter('Release', '.github/workflows/release.yml', filter(['RELEASE'])),
+    ).toBe(true);
+    // And exclude semantics are symmetric: an exclude glob still bites under
+    // any casing.
+    expect(workflowMatchesFilter('CI', '.github/workflows/CI.yml', filter([], ['CI']))).toBe(false);
+    expect(workflowMatchesFilter('CI', '.github/workflows/CI.yml', filter([], ['ci']))).toBe(false);
+  });
 });

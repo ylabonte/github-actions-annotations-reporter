@@ -1,6 +1,10 @@
 /**
  * Tiny glob matcher: `*` matches any non-slash characters; `**` matches across slashes.
- * Used to filter workflows by name or repo-relative path.
+ * Used to filter workflows by name or repo-relative path. **Case-insensitive**:
+ * workflow display names ("CI", "Release") are typed by humans with arbitrary
+ * casing, and a user invoking `--workflows ci` reasonably expects to match a
+ * workflow named `CI`. Linux paths are technically case-sensitive but in the
+ * CI-filter context the lenient match is the less-surprising default.
  */
 export function globToRegex(glob: string): RegExp {
   let result = '^';
@@ -23,7 +27,7 @@ export function globToRegex(glob: string): RegExp {
     }
   }
   result += '$';
-  return new RegExp(result);
+  return new RegExp(result, 'i');
 }
 
 export function matchesAny(value: string, globs: readonly string[]): boolean {
