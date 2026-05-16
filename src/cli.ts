@@ -24,7 +24,31 @@ export function buildProgram(): Command {
     .description(
       'Scan the latest GitHub Actions workflow runs for annotations and file dedup-aware GitHub Issues.',
     )
-    .version(pkg.version);
+    .version(pkg.version)
+    .addHelpText(
+      'after',
+      `\nExamples:
+  $ ghaar scan --dry-run                       # Preview what would be filed; never writes.
+  $ ghaar report --min-severity warning        # File issues for warnings + errors.
+  $ ghaar report --json-out report.json        # Same, plus a structured JSON report.
+  $ ghaar list                                 # List currently-managed issues by label.
+
+Repository resolution:
+  --repo <owner/name>   →   $GITHUB_REPOSITORY   →   git remote get-url origin
+  The first one that resolves wins. Run from inside a cloned GitHub repo and
+  no flag is needed.
+
+Authentication:
+  --token <token>       →   $GITHUB_TOKEN  →  $GH_TOKEN  →  \`gh auth token\`
+  Anonymous is allowed but rate-limited (60 req/hr) and cannot create issues.
+
+Exit codes:
+  0  success — pipeline ran (issues filed/updated/closed as configured).
+  1  error  — auth, repo resolution, or GitHub API failure.
+  2  --fail-on-new was set and at least one new issue was created.
+
+Full docs: https://ylabonte.github.io/github-actions-annotations-reporter/`,
+    );
 
   program
     .addCommand(
@@ -64,7 +88,10 @@ function buildCommand(name: string, description: string): Command {
   const cmd = new Command(name).description(description);
   cmd
     .option('--token <token>', 'GitHub token (falls back to GITHUB_TOKEN / gh auth token)')
-    .option('--repo <owner/name>', 'Target repository (falls back to GITHUB_REPOSITORY)')
+    .option(
+      '--repo <owner/name>',
+      "Target repository (falls back to GITHUB_REPOSITORY, then to the local git remote 'origin')",
+    )
     .option(
       '--branch <branch>',
       'Branch whose latest run is scanned (defaults to repo default branch)',
