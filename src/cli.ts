@@ -34,7 +34,7 @@ export function buildProgram(): Command {
           'Print every found annotation with full detail (also adds `annotations[]` to the JSON report)',
         )
         .action(async (_args, cmd) => {
-          process.exitCode = await runScanCommand(normalize(cmd.opts()));
+          process.exitCode = await runScanCommand(normalize(cmd));
         }),
     )
     .addCommand(
@@ -45,12 +45,12 @@ export function buildProgram(): Command {
         )
         .option('--fail-on-new', 'Exit non-zero if any new issues were created')
         .action(async (_args, cmd) => {
-          process.exitCode = await runReportCommand(normalize(cmd.opts()));
+          process.exitCode = await runReportCommand(normalize(cmd));
         }),
     )
     .addCommand(
       buildCommand('list', 'List currently-managed issues').action(async (_args, cmd) => {
-        process.exitCode = await runListCommand(normalize(cmd.opts()));
+        process.exitCode = await runListCommand(normalize(cmd));
       }),
     );
 
@@ -102,17 +102,42 @@ function buildCommand(name: string, description: string): Command {
   return cmd;
 }
 
+/**
+ * Strict integer coercion for numeric flags. `Number.parseInt('10abc', 10)`
+ * returns `10` without error, so a user mistyping `--max-issues 10k` would
+ * silently get `10`. We require the entire input to match `^-?\d+$` so a
+ * typo produces a precise CLI error instead of a half-parsed value.
+ */
 function parseIntegerArg(flag: string): (value: string) => number {
   return (value) => {
+    if (!/^-?\d+$/.test(value)) {
+      throw new InvalidArgumentError(`${flag} expects an integer, got "${value}"`);
+    }
     const n = Number.parseInt(value, 10);
-    if (Number.isNaN(n)) {
+    if (!Number.isFinite(n)) {
       throw new InvalidArgumentError(`${flag} expects an integer, got "${value}"`);
     }
     return n;
   };
 }
 
-function normalize(opts: Record<string, unknown>): CommonCliOptions {
+/**
+ * Distinguish "user passed the flag" from "commander defaulted it" for
+ * tri-state booleans declared via `--no-X` syntax. Without this, the auto-
+ * `true` default applies on every invocation and silently overrides a
+ * `false` value in the user's `.ghaarrc` config file. Drop any key whose
+ * value didn't come from the CLI so downstream merge logic only sees an
+ * explicit user choice.
+ */
+const TRI_STATE_BOOLEAN_KEYS = [
+  'autoClose',
+  'autoCloseRequireSuccess',
+  'wontfixRespectStateReason',
+  'progress',
+] as const;
+
+export function normalize(cmd: Command): CommonCliOptions {
+  const opts = cmd.opts() as Record<string, unknown>;
   const minSeverity =
     opts['minSeverity'] === 'notice' ||
     opts['minSeverity'] === 'warning' ||
@@ -122,6 +147,13 @@ function normalize(opts: Record<string, unknown>): CommonCliOptions {
   const out: Record<string, unknown> = { ...opts };
   delete out['minSeverity'];
   if (minSeverity) out['minSeverity'] = minSeverity;
+
+  for (const key of TRI_STATE_BOOLEAN_KEYS) {
+    if (cmd.getOptionValueSource(key) !== 'cli') {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete out[key];
+    }
+  }
   return out;
 }
 
