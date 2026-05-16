@@ -27,6 +27,28 @@ That's it. With no inputs the action will scan every workflow on the
 default branch, file issues for every annotation, and respect the default
 won't-fix / auto-close settings.
 
+### Version pinning
+
+The `@v1` reference above is a **floating major tag**: every patch and minor
+release in the `v1.x.y` line will be picked up automatically, including bug
+fixes and security patches. For most consumers this is what you want.
+
+If you need fully reproducible builds — e.g. for compliance or to lock the
+action's exact behavior to a known-good revision — pin to an exact tag or
+commit SHA instead:
+
+```yaml
+# Exact version (rebuildable, but you must bump manually for fixes):
+- uses: ylabonte/github-actions-annotations-reporter@v1.2.3
+
+# Or a full commit SHA (most immutable; gets a Dependabot bump when set):
+- uses: ylabonte/github-actions-annotations-reporter@<40-char-sha>
+```
+
+The floating `v1` tag is updated by the release workflow with
+`--force-with-lease`, so it always points at the highest released
+`v1.x.y` — but the tag itself is mutable.
+
 ## Common patterns
 
 ### Warnings + errors only

@@ -65,12 +65,23 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
 
-      # When a publish actually happened, force-push the floating major-version tag
+      # When a publish actually happened, move the floating major-version tag
       # (e.g. v1 → the just-released v1.x.y) so users can do
       # `uses: ylabonte/github-actions-annotations-reporter@v1`. Exact-version tags
       # (v1.2.3) are already created by changesets — this step only adds/moves the
       # floating one. The major number is read from our own package.json, so there's no
       # injection surface; the tag-push uses git's own argv splitting.
+      #
+      # We use `--force-with-lease` instead of `--force` so that if a concurrent run
+      # (e.g. a hotfix release on the same major) has already moved the tag, this push
+      # is rejected instead of silently clobbering it. The expected-remote ref is fetched
+      # via `git ls-remote` immediately before the push to give --force-with-lease the
+      # tightest possible expectation (defaults to "tag did not exist", which would always
+      # fail once the tag is in place).
+      #
+      # NOTE FOR CONSUMERS: pinning `@v1` opts into receiving every v1.x.y patch and minor
+      # automatically. For reproducible builds, pin an exact version (`@v1.2.3`) or a full
+      # commit SHA (`@<sha>`) — see docs/guide/use-as-action.md.
       - name: Update floating v<major> tag
         if: steps.changesets.outputs.published == 'true'
         run: |
@@ -80,4 +91,12 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git tag -f "$major"
-          git push origin "$major" --force
+          # Capture the remote's current sha for $major (empty if the tag is new) to
+          # supply as the expected-value to --force-with-lease. An empty string means
+          # "expect the ref not to exist" and falls through to a normal push.
+          expected="$(git ls-remote origin "refs/tags/$major" | awk '{print $1}')"
+          if [ -n "$expected" ]; then
+            git push origin "$major" --force-with-lease="refs/tags/$major:$expected"
+          else
+            git push origin "$major"
+          fi
