@@ -50,7 +50,7 @@ pnpm docs:gen-cli
 git add docs/reference/cli.md
 ```
 
-CI does not verify the regenerated file is up-to-date — a miss ships silently.
+CI runs `pnpm docs:gen-cli` followed by `git diff --exit-code docs/reference/cli.md` in the static-checks job, so missing the regen fails CI with a visible diff. The file is still committed by hand — CI guardrails the freshness, it doesn't generate the artifact for you.
 
 ## Changesets
 
