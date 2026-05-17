@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command, InvalidArgumentError, Option } from '@commander-js/extra-typings';
+import { realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { runScanCommand } from './commands/scan.js';
@@ -191,10 +192,20 @@ export function normalize(cmd: Command): CommonCliOptions {
 // (e.g. from `docs/scripts/gen-cli-ref.ts`) must NOT trigger arg parsing.
 // `pathToFileURL` handles Windows drive letters and backslashes correctly;
 // a hand-built `file://${argv[1]}` would produce a malformed URL on Windows.
+//
+// `realpathSync` is critical for the `npm install -g` case: npm puts a
+// symlink at e.g. `<prefix>/bin/ghaar` pointing into
+// `<prefix>/lib/node_modules/<pkg>/dist/cli.js`. Without resolving the
+// symlink, `process.argv[1]` is the symlink path while `import.meta.url`
+// is the resolved module path — they never match, the CLI thinks it's
+// being imported, and exits silently. realpath turns both into their
+// canonical form so the comparison works. On Windows, npm uses .cmd shims
+// rather than symlinks, so realpath is a benign no-op on the already-real
+// path.
 const isMainModule = (() => {
   if (!process.argv[1]) return false;
   try {
-    return import.meta.url === pathToFileURL(process.argv[1]).href;
+    return import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
   } catch {
     return false;
   }
