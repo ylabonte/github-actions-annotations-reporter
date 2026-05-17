@@ -1,5 +1,5 @@
 name: github-actions-annotations-reporter
-description: Scan the latest GitHub Actions workflow runs for annotations and file dedup-aware GitHub Issues, with severity filters, won't-fix history-aware suppression, and auto-close when annotations vanish.
+description: Turn workflow annotations into dedup-aware GitHub Issues — severity-labeled, won't-fix-aware, auto-closing when noise stops.
 author: Yannic Labonte
 
 branding:
