@@ -61,15 +61,10 @@ export async function runPipeline(options: RunPipelineOptions): Promise<RunPipel
     options.explicitToken ? { explicitToken: options.explicitToken } : {},
   );
 
+  // resolveRepo's default `notify` writes the "Resolved repo X from local
+  // git remote 'origin'" line to stderr — the audit signal we want here.
+  // No need to pass a custom one unless we ever route the notice elsewhere.
   const repo = await resolveRepo(options.explicitRepo, {
-    // Write the "Resolved repo X from local git remote 'origin'" line to
-    // stderr unconditionally — it is an audit signal ("where did the target
-    // come from?"), not spinner UX, so it must not be silenced by --json
-    // or --no-progress modes that disable the progress reporter. stdout is
-    // reserved for the JSON report, so stderr is always safe.
-    notify: (msg) => {
-      process.stderr.write(`${msg}\n`);
-    },
     ...(options.runGit ? { runGit: options.runGit } : {}),
   });
   if (!repo) {

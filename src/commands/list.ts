@@ -24,11 +24,9 @@ export async function runListCommand(
   // behaviour of resolveAuth's `explicit` branch.
   const auth = await resolveAuth(prepared.token ? { explicitToken: prepared.token } : {});
   const progress = createProgress({ enabled: shouldShowProgress(opts) });
+  // resolveRepo's default `notify` writes the audit line to stderr —
+  // see src/core/github/repo.ts::defaultResolveRepoNotify.
   const repo = await resolveRepo(prepared.repo, {
-    // Always-on audit signal — see the matching comment in src/core/pipeline.ts.
-    notify: (msg) => {
-      process.stderr.write(`${msg}\n`);
-    },
     ...(overrides.runGit ? { runGit: overrides.runGit } : {}),
   });
   if (!repo) {
