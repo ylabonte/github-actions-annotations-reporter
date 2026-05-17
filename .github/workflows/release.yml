@@ -43,15 +43,18 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
           registry-url: https://registry.npmjs.org
-      # npm 11.5+ is required for trusted-publishing OIDC. Node 22 ships
-      # with npm 10.x by default, so we install npm 11 explicitly. Pin to
-      # the 11.x major so the release pipeline doesn't silently start
-      # using a future npm major (12+) that could change the publish flow,
-      # OIDC token format, or pnpm interop mid-release. Bump the floor
-      # here intentionally after validating the next major.
+      # npm 11.5+ is required for trusted-publishing OIDC. Node 24 ships
+      # with npm 11 by default, so this is a same-major refresh (11.x →
+      # latest 11.y) rather than a cross-major self-upgrade — much more
+      # reliable than the 10 → 11 jump that previously broke with
+      # "MODULE_NOT_FOUND: promise-retry" mid-self-replace. Pin to the
+      # 11.x major so the pipeline doesn't silently start using a future
+      # npm major (12+) that could change the publish flow, OIDC token
+      # format, or pnpm interop mid-release. Bump the floor here
+      # intentionally after validating the next major.
       - run: npm install -g npm@^11
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
