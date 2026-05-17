@@ -214,15 +214,20 @@ runs:
         # of this action in one job don't collide on the same node_modules.
         # `--no-save` and the throwaway prefix mean nothing leaks back to
         # the workflow's checkout.
+        #
+        # Both the install AND the CLI run under suspended `errexit`: if
+        # the install fails (network, missing version, registry down), the
+        # action must still emit its `json` / counter outputs (set to the
+        # safe defaults below) instead of dying half-way and leaving
+        # downstream steps with no values. The `&&` short-circuit means we
+        # only invoke the CLI when the install succeeded; `cli_exit` then
+        # captures whichever step failed (install non-zero → cli_exit > 0,
+        # bin invocation non-zero → cli_exit > 0).
         ghaar_install=$(mktemp -d "$RUNNER_TEMP/ghaar-install.XXXXXXXX")
-        npm install --silent --no-save --no-audit --no-fund --prefix "$ghaar_install" \
-          "github-actions-annotations-reporter@$GHAAR_VERSION"
-
-        # Run the CLI under suspended `errexit` so a non-zero exit (notably from
-        # --fail-on-new) does NOT kill the script before we've written outputs.
-        # Downstream steps need access to `json` / counts even when the action fails.
         set +e
-        "$ghaar_install/node_modules/.bin/ghaar" "${args[@]}"
+        npm install --silent --no-save --no-audit --no-fund --prefix "$ghaar_install" \
+          "github-actions-annotations-reporter@$GHAAR_VERSION" \
+          && "$ghaar_install/node_modules/.bin/ghaar" "${args[@]}"
         cli_exit=$?
         set -e
 
