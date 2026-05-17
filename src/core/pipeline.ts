@@ -1,5 +1,5 @@
 import { createOctokit, type OctokitInstance } from './github/client.js';
-import { getDefaultBranch, resolveRepoFromEnv } from './github/repo.js';
+import { getDefaultBranch, resolveRepo } from './github/repo.js';
 import {
   addIssueComment,
   createIssue,
@@ -41,6 +41,9 @@ export interface RunPipelineOptions {
   readonly now?: Date;
   readonly octokit?: OctokitInstance;
   readonly progress?: ProgressReporter;
+  // Injection point for tests: swap the `git remote get-url` executor so the
+  // test environment's own .git/ directory doesn't leak into resolution.
+  readonly runGit?: (args: readonly string[], cwd?: string) => Promise<string | null>;
 }
 
 export interface RunPipelineResult {
@@ -58,10 +61,15 @@ export async function runPipeline(options: RunPipelineOptions): Promise<RunPipel
     options.explicitToken ? { explicitToken: options.explicitToken } : {},
   );
 
-  const repo = options.explicitRepo ?? resolveRepoFromEnv();
+  // resolveRepo's default `notify` writes the "Resolved repo X from local
+  // git remote 'origin'" line to stderr — the audit signal we want here.
+  // No need to pass a custom one unless we ever route the notice elsewhere.
+  const repo = await resolveRepo(options.explicitRepo, {
+    ...(options.runGit ? { runGit: options.runGit } : {}),
+  });
   if (!repo) {
     throw new Error(
-      'Could not determine the target repository. Set GITHUB_REPOSITORY or pass --repo owner/name.',
+      'Could not determine the target repository. Pass --repo owner/name, set GITHUB_REPOSITORY, or run from inside a checked-out GitHub repository (origin remote).',
     );
   }
 

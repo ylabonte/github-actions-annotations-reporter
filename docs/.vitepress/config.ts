@@ -26,6 +26,7 @@ export default defineConfig({
       { text: 'Guide', link: '/guide/quickstart' },
       { text: 'CLI reference', link: '/reference/cli' },
       { text: 'Recipes', link: '/recipes/' },
+      { text: 'Release notes', link: `https://github.com/ylabonte/${REPO}/releases` },
       { text: 'GitHub', link: `https://github.com/ylabonte/${REPO}` },
     ],
     sidebar: {

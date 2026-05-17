@@ -25,7 +25,7 @@ features:
   - title: Idempotent state in-body
     details: Persisted last-seen, miss counter, and first-seen timestamps live in HTML comments inside the issue body. No external datastore.
   - title: Tested above 90%
-    details: 120+ unit tests, strict TypeScript, hardened composite-action bash dispatcher. CI runs on Node 20 and 22, Linux and macOS.
+    details: 190+ unit tests, strict TypeScript, hardened composite-action bash dispatcher. CI runs on Node 22 across Linux, macOS, and Windows.
 ---
 
 ## Install

@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     branches: [main]
+  # Manual re-trigger for the 1.0.0 bootstrap and any future case where the
+  # workflow needs to re-evaluate `main` without a fresh push (e.g. retrying
+  # a publish after npmjs.org trusted-publisher config changes). The job is
+  # idempotent: pending changesets → update Version Packages PR, none → try
+  # publish (no-op if the version is already on the registry).
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -19,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: npm-publish
     steps:
-      - uses: actions/create-github-app-token@v1
+      - uses: actions/create-github-app-token@v3
         id: app-token
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
@@ -37,14 +43,15 @@ jobs:
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
           registry-url: https://registry.npmjs.org
-      # npm 11.5+ is required for trusted-publishing OIDC. Node 20 ships
-      # with npm 10. Pin to the 11.x major so the release pipeline doesn't
-      # silently start using a future npm major (12+) that could change the
-      # publish flow, OIDC token format, or pnpm interop mid-release. Bump
-      # the floor here intentionally after validating the next major.
+      # npm 11.5+ is required for trusted-publishing OIDC. Node 22 ships
+      # with npm 10.x by default, so we install npm 11 explicitly. Pin to
+      # the 11.x major so the release pipeline doesn't silently start
+      # using a future npm major (12+) that could change the publish flow,
+      # OIDC token format, or pnpm interop mid-release. Bump the floor
+      # here intentionally after validating the next major.
       - run: npm install -g npm@^11
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
@@ -56,13 +63,11 @@ jobs:
           version: pnpm exec changeset version
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          # Temporary: bootstraps the first publish of the package (npm
-          # trusted publishing can only be configured for packages that
-          # already exist on the registry). Revert this line and delete the
-          # NPM_TOKEN repo secret once 1.0.0 is on npm and the trusted
-          # publisher has been configured on npmjs.org. changesets/action
-          # prefers NPM_TOKEN when set and falls back to OIDC otherwise.
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # OIDC trusted publishing only. The first publish (v1.0.0) was made
+          # locally with npm 2FA — the trusted-publisher relationship on
+          # npmjs.org can only be configured once the package exists, so the
+          # very first release cannot run through CI. Every subsequent release
+          # runs here via the OIDC token issued from `permissions.id-token: write`.
           NPM_CONFIG_PROVENANCE: 'true'
 
       # When a publish actually happened, move the floating major-version tag

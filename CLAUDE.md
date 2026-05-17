@@ -2,7 +2,7 @@
 
 ## Project at a glance
 
-- **Stack:** TypeScript ESM (NodeNext, `strict` + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`), Node 20+, pnpm. Vitest + `@vitest/coverage-v8`. ESLint (strict-type-checked + unicorn) + Prettier. VitePress for docs. Changesets for releases.
+- **Stack:** TypeScript ESM (NodeNext, `strict` + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes`), Node 22+, pnpm. Vitest + `@vitest/coverage-v8`. ESLint (strict-type-checked + unicorn) + Prettier. VitePress for docs. Changesets for releases.
 - **Two surfaces:** a CLI (`ghaar`) and a composite GitHub Action. Both share the same domain core under `src/core/`.
 - **Domain:** scan GitHub Actions workflow run annotations across the latest run per workflow, fingerprint them stably, file/update/reopen/auto-close issues based on history. The auto-close decision is guarded by miss counter + age window + (default) source-run-success.
 - **Fingerprint:** sha256(`workflowPath \0 annotationPath \0 normalizedMessage`). Line numbers are intentionally NOT part of the preimage.

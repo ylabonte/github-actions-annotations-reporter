@@ -11,6 +11,17 @@ to file or update issues. Token resolution happens in this order:
 
 The first source that returns a non-empty string wins.
 
+## Resolving the target repository
+
+Separate from auth, the CLI also needs to know which repo to scan. It
+walks a parallel three-step chain — `--repo owner/name`, then the
+`GITHUB_REPOSITORY` env var, then `git remote get-url origin` from the
+current working directory. The last step makes a fresh `git clone …`
+checkout work with no flags at all; non-GitHub remotes (GitLab,
+Bitbucket, self-hosted GitHub Enterprise Server) are deliberately
+ignored. See the [quickstart](./quickstart#resolve-the-target-repo) for
+the full chain.
+
 ## Required scopes
 
 For a personal access token (classic):

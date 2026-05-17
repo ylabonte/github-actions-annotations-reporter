@@ -1,5 +1,13 @@
 # github-actions-annotations-reporter
 
+[![CI](https://github.com/ylabonte/github-actions-annotations-reporter/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/ylabonte/github-actions-annotations-reporter/actions/workflows/ci.yml)
+[![Docs](https://github.com/ylabonte/github-actions-annotations-reporter/actions/workflows/deploy-docs.yml/badge.svg)](https://ylabonte.github.io/github-actions-annotations-reporter/)
+[![npm version](https://img.shields.io/npm/v/github-actions-annotations-reporter.svg)](https://www.npmjs.com/package/github-actions-annotations-reporter)
+[![Node](https://img.shields.io/node/v/github-actions-annotations-reporter.svg)](https://nodejs.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
+📖 **Full docs:** <https://ylabonte.github.io/github-actions-annotations-reporter/>
+
 A TypeScript/Node CLI **and** GitHub Action that scans the latest GitHub Actions
 workflow runs for annotations (notice / warning / error), files **deduplicated**
 GitHub Issues for them, and **auto-closes** issues when the underlying
@@ -60,21 +68,46 @@ See [`action.yml`](./action.yml) for the full input/output reference.
 
 ## Use as a CLI
 
+The package installs a single binary, `ghaar`. The npm package name
+(`github-actions-annotations-reporter`) and the bin name (`ghaar`) both
+work with `npx`; the short form is used throughout the docs.
+
 ```sh
-# Dry-run scan against the current repo (resolved from git remote / GITHUB_REPOSITORY)
-GITHUB_TOKEN=$(gh auth token) npx github-actions-annotations-reporter scan --dry-run
+# Run ephemerally with npx
+npx github-actions-annotations-reporter scan --dry-run
 
-# Same scan, but also print every annotation with full detail (fielded blocks).
-# Add --json to surface them as `annotations[]` inside the JSON report instead.
-GITHUB_TOKEN=$(gh auth token) npx github-actions-annotations-reporter scan \
-  --dry-run --list-annotations
+# Or install globally, then run `ghaar`
+# (you may need a fresh shell, or your npm global bin directory on PATH)
+npm install -g github-actions-annotations-reporter
+ghaar scan --dry-run
+```
 
-# Apply: create/update/auto-close issues as needed
-GITHUB_TOKEN=$(gh auth token) npx github-actions-annotations-reporter report \
+Repository and auth are resolved automatically when invoked from inside a
+clone:
+
+```sh
+# Dry-run from a checked-out repo: --repo is auto-detected from the
+# local git remote `origin`; --token from `gh auth token`.
+ghaar scan --dry-run
+
+# Same scan, plus every annotation with full detail (fielded blocks).
+# Add --json to surface them inside the JSON report's annotations[].
+ghaar scan --dry-run --list-annotations
+
+# Apply: create / update / reopen / auto-close issues as needed.
+ghaar report \
   --repo owner/name \
   --min-severity warning \
   --json-out ./annotations-report.json
+
+# List currently-managed issues (by management label).
+ghaar list
 ```
+
+The full resolution chain is:
+
+- **Repository:** `--repo owner/name` → `GITHUB_REPOSITORY` → `git remote get-url origin`.
+- **Auth:** `--token` → `GITHUB_TOKEN` → `GH_TOKEN` → `gh auth token` → anonymous (rate-limited, no writes).
 
 CLI commands:
 
@@ -83,6 +116,9 @@ CLI commands:
 | `scan`   | Walk workflows + annotations and print the action plan (no writes).  |
 | `report` | Same scan, then apply: create / update / reopen / auto-close issues. |
 | `list`   | List currently-managed issues by management label.                   |
+
+Run `ghaar --help` or `ghaar <command> --help` for the full flag set, or
+see the [CLI reference](https://ylabonte.github.io/github-actions-annotations-reporter/reference/cli) on the docs site.
 
 ## How auto-close stays safe
 
@@ -103,6 +139,18 @@ completed` (never `not_planned`, so it is distinct from user-driven
 suppression), and if the annotation returns the same issue is **reopened**
 rather than duplicated.
 
+## Docs & support
+
+- 📖 [Full documentation](https://ylabonte.github.io/github-actions-annotations-reporter/) — guides, recipes, CLI + JSON references.
+- 🐛 [Issue tracker](https://github.com/ylabonte/github-actions-annotations-reporter/issues) — bug reports and feature requests.
+- 📋 [Release notes](https://github.com/ylabonte/github-actions-annotations-reporter/releases).
+
+## Contributing
+
+Pull requests welcome — see [CONTRIBUTING.md](./CONTRIBUTING.md) for the
+local-dev setup, test/lint expectations, and how releases ship via
+changesets.
+
 ## License
 
-MIT
+[MIT](./LICENSE) © Yannic Labonte.

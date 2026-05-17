@@ -11,11 +11,36 @@ import { buildProgram } from '../../src/cli.js';
 const dirname = fileURLToPath(new URL('.', import.meta.url));
 const refFile = path.join(dirname, '..', 'reference', 'cli.md');
 
+// `helpInformation()` returns commander's static help body and skips any
+// `addHelpText('after', ...)` content. `outputHelp()` triggers the event
+// hooks (afterHelp etc.) and is what `--help` actually renders to the
+// terminal at runtime — divert its output into a buffer via
+// `configureOutput` so the docs match the user-visible help byte-for-byte.
+// `cmd` is typed `any` because we operate on both the top-level program
+// (`Command<[], {}, {}>`) and its subcommands (which commander narrows to
+// `CommandUnknownOpts`); the two are method-compatible at runtime but
+// don't unify under exactOptionalPropertyTypes.
+function renderHelp(cmd: {
+  configureOutput: (opts: { writeOut?: (s: string) => void }) => void;
+  outputHelp: () => void;
+}): string {
+  let buf = '';
+  // No restore step is needed afterwards: this script is a one-shot
+  // entrypoint, each `cmd` instance only has its help rendered once, and
+  // commander's `configureOutput({})` does not actually restore the prior
+  // `writeOut` (it merges the partial config rather than resetting), so a
+  // try/finally with `configureOutput({})` would convey "restore" intent
+  // it doesn't fulfill.
+  cmd.configureOutput({ writeOut: (s) => (buf += s) });
+  cmd.outputHelp();
+  return buf;
+}
+
 const program = buildProgram();
-const rootHelp = program.helpInformation();
+const rootHelp = renderHelp(program);
 const subHelp = program.commands
   .filter((c) => c.name() !== 'help')
-  .map((c) => `### \`ghaar ${c.name()}\`\n\n\`\`\`\n${c.helpInformation().trim()}\n\`\`\``)
+  .map((c) => `### \`ghaar ${c.name()}\`\n\n\`\`\`\n${renderHelp(c).trim()}\n\`\`\``)
   .join('\n\n');
 
 const content = await readFile(refFile, 'utf8');
