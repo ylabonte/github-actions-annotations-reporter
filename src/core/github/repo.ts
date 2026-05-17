@@ -24,13 +24,25 @@ export function resolveRepoFromEnv(env: NodeJS.ProcessEnv = process.env): RepoRe
 // deliberately not matched because the rest of the codebase is hardcoded to
 // api.github.com — silently auto-detecting a GHES origin would just produce
 // confusing auth errors several layers deep.
+//
+// The owner and repo character classes are restricted to `[A-Za-z0-9._-]` —
+// the actual GitHub naming rules. Crucially this excludes the URL-meta
+// characters `?` (query) and `#` (fragment), which a more permissive
+// `[^/\s]+?` pattern would otherwise lazily absorb into the repo capture
+// (e.g. `https://github.com/foo/bar.git?ref=main` would parse to
+// `{ owner: 'foo', repo: 'bar.git?ref=main' }` instead of `null`).
+const OWNER_REPO = '[A-Za-z0-9._-]+';
 const GITHUB_REMOTE_PATTERNS = [
   // git@github.com:owner/repo[.git]
-  /^git@github\.com:([^/\s]+)\/([^/\s]+?)(?:\.git)?$/,
+  new RegExp(String.raw`^git@github\.com:(${OWNER_REPO})/(${OWNER_REPO}?)(?:\.git)?$`),
   // [git+]ssh://[user@]github.com[:port]/owner/repo[.git]
-  /^(?:git\+)?ssh:\/\/(?:[^@/]+@)?github\.com(?::\d+)?\/([^/\s]+)\/([^/\s]+?)(?:\.git)?$/,
+  new RegExp(
+    String.raw`^(?:git\+)?ssh://(?:[^@/]+@)?github\.com(?::\d+)?/(${OWNER_REPO})/(${OWNER_REPO}?)(?:\.git)?$`,
+  ),
   // [git+]https://[creds@]github.com/owner/repo[.git]
-  /^(?:git\+)?https?:\/\/(?:[^@/]+@)?github\.com\/([^/\s]+)\/([^/\s]+?)(?:\.git)?$/,
+  new RegExp(
+    String.raw`^(?:git\+)?https?://(?:[^@/]+@)?github\.com/(${OWNER_REPO})/(${OWNER_REPO}?)(?:\.git)?$`,
+  ),
 ] as const;
 
 export function parseGitHubRemoteUrl(url: string): RepoRef | null {
@@ -85,16 +97,36 @@ async function defaultRunGit(args: readonly string[], cwd?: string): Promise<str
 export interface ResolveRepoOptions {
   readonly cwd?: string;
   readonly env?: NodeJS.ProcessEnv;
+  /**
+   * Override the audit-line emitter. Defaults to writing a single line to
+   * stderr — see `defaultResolveRepoNotify`. Passing a no-op function fully
+   * silences the notice; passing a `vi.fn()` is the test pattern. Callers
+   * who want the line piped somewhere specific (a logger, an Action
+   * annotation, a file) can plug in here.
+   */
   readonly notify?: (msg: string) => void;
   readonly runGit?: ResolveRepoFromGitRemoteOptions['runGit'];
 }
 
 /**
+ * Default notify implementation — writes the "Resolved repo …" line to
+ * stderr unconditionally. It's an audit signal ("where did the target repo
+ * come from?"), not spinner UX, so it must not be gated by --json /
+ * --no-progress / non-TTY modes. stdout is reserved for the JSON report.
+ *
+ * Exposed as a separate function so tests can spy on it via the `notify`
+ * option without duplicating the message string.
+ */
+function defaultResolveRepoNotify(msg: string): void {
+  process.stderr.write(`${msg}\n`);
+}
+
+/**
  * Three-step repository resolution: explicit (`--repo`) → `GITHUB_REPOSITORY`
  * env → local `git remote get-url origin`. The `notify` callback fires only
- * when the git-remote step wins, so callers can print a one-line "Resolved
- * repo from git remote" hint without it being noisy in CI (where the env
- * step wins).
+ * when the git-remote step wins, so callers see a one-line "Resolved repo
+ * from git remote" hint without it being noisy in CI (where the env step
+ * wins). When not overridden, the notice goes to stderr.
  */
 export async function resolveRepo(
   explicit: RepoRef | undefined,
@@ -110,9 +142,8 @@ export async function resolveRepo(
     ...(options.runGit ? { runGit: options.runGit } : {}),
   });
   if (fromGit) {
-    options.notify?.(
-      `Resolved repo ${fromGit.owner}/${fromGit.repo} from local git remote 'origin'.`,
-    );
+    const notify = options.notify ?? defaultResolveRepoNotify;
+    notify(`Resolved repo ${fromGit.owner}/${fromGit.repo} from local git remote 'origin'.`);
     return fromGit;
   }
 

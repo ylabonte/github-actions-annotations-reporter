@@ -68,6 +68,23 @@ describe('parseGitHubRemoteUrl', () => {
   ])('returns null for non-GitHub remote %s', (url) => {
     expect(parseGitHubRemoteUrl(url)).toBeNull();
   });
+
+  // `git remote get-url` never produces these forms in practice, but a
+  // user-configured remote could. Lock in the strict-anchored behavior of
+  // GITHUB_REMOTE_PATTERNS: anything trailing beyond `[.git]` (slash, query
+  // string, fragment, extra path segment) is treated as not-a-GitHub-remote
+  // and falls through to the explicit `--repo` / GITHUB_REPOSITORY paths.
+  it.each([
+    ['https://github.com/foo/bar/'], // trailing slash
+    ['https://github.com/foo/bar.git/'], // trailing slash after .git
+    ['https://github.com/foo/bar.git?ref=main'], // query string
+    ['https://github.com/foo/bar.git#readme'], // URL fragment
+    ['https://github.com/foo/bar/extra'], // extra path segment
+    ['https://github.com/foo'], // missing repo segment
+    ['git@github.com:foo/bar.git/'], // SSH trailing slash
+  ])('returns null for malformed-but-GitHub-host %s', (url) => {
+    expect(parseGitHubRemoteUrl(url)).toBeNull();
+  });
 });
 
 describe('resolveRepoFromGitRemote', () => {
