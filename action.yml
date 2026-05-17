@@ -201,20 +201,28 @@ runs:
         report=$(mktemp "$RUNNER_TEMP/ghaar.XXXXXXXX.json")
         args+=(--json-out "$report")
 
+        # Install the package to a fresh prefix and invoke its bin directly,
+        # rather than relying on `npx -p PKG BIN` or `npm exec --package=PKG`.
+        # On `ubuntu-latest` runners (npm 10.x in the ubuntu-24.04 image),
+        # both heuristic-based forms were observed to skip the install step
+        # and fall through to `sh -c "ghaar …"` → `command not found` →
+        # exit 127. Explicit `npm install --prefix` + direct invocation of
+        # `node_modules/.bin/ghaar` bypasses every bin-resolution code path
+        # and works identically on npm 10 and 11.
+        #
+        # `mktemp -d` gives a unique per-invocation prefix so multiple uses
+        # of this action in one job don't collide on the same node_modules.
+        # `--no-save` and the throwaway prefix mean nothing leaks back to
+        # the workflow's checkout.
+        ghaar_install=$(mktemp -d "$RUNNER_TEMP/ghaar-install.XXXXXXXX")
+        npm install --silent --no-save --no-audit --no-fund --prefix "$ghaar_install" \
+          "github-actions-annotations-reporter@$GHAAR_VERSION"
+
         # Run the CLI under suspended `errexit` so a non-zero exit (notably from
         # --fail-on-new) does NOT kill the script before we've written outputs.
         # Downstream steps need access to `json` / counts even when the action fails.
-        #
-        # Use `npm exec --package=…` with an explicit `--` separator rather than
-        # `npx -y -p X bin`: on ubuntu-latest runners (which ship npm 10.x by
-        # default until their image bundles npm 11), the `-p X` form of npx was
-        # observed to skip the install step and fall through to `sh -c "ghaar …"`
-        # → `command not found` → exit 127. `npm exec --package=…` is unambiguous
-        # about which token is the package spec and which is the bin to run, and
-        # works identically on npm 10 and 11. The `--yes` flag suppresses the
-        # interactive "install? y/N" prompt in fresh-cache scenarios.
         set +e
-        npm exec --yes --package="github-actions-annotations-reporter@$GHAAR_VERSION" -- ghaar "${args[@]}"
+        "$ghaar_install/node_modules/.bin/ghaar" "${args[@]}"
         cli_exit=$?
         set -e
 
