@@ -1,5 +1,5 @@
 name: github-actions-annotations-reporter
-description: Scan the latest GitHub Actions workflow runs for annotations and file dedup-aware GitHub Issues, with severity filters, won't-fix history-aware suppression, and auto-close when annotations vanish.
+description: Turn workflow annotations into dedup-aware GitHub Issues — severity-labeled, won't-fix-aware, auto-closing when noise stops.
 author: Yannic Labonte
 
 branding:
@@ -201,12 +201,33 @@ runs:
         report=$(mktemp "$RUNNER_TEMP/ghaar.XXXXXXXX.json")
         args+=(--json-out "$report")
 
-        # Run the CLI under suspended `errexit` so a non-zero exit (notably from
-        # --fail-on-new) does NOT kill the script before we've written outputs.
-        # Downstream steps need access to `json` / counts even when the action fails.
-        # `-p package binary` decouples the npm package name from its `bin` entry.
+        # Install the package to a fresh prefix and invoke its bin directly,
+        # rather than relying on `npx -p PKG BIN` or `npm exec --package=PKG`.
+        # On `ubuntu-latest` runners (npm 10.x in the ubuntu-24.04 image),
+        # both heuristic-based forms were observed to skip the install step
+        # and fall through to `sh -c "ghaar …"` → `command not found` →
+        # exit 127. Explicit `npm install --prefix` + direct invocation of
+        # `node_modules/.bin/ghaar` bypasses every bin-resolution code path
+        # and works identically on npm 10 and 11.
+        #
+        # `mktemp -d` gives a unique per-invocation prefix so multiple uses
+        # of this action in one job don't collide on the same node_modules.
+        # `--no-save` and the throwaway prefix mean nothing leaks back to
+        # the workflow's checkout.
+        #
+        # Both the install AND the CLI run under suspended `errexit`: if
+        # the install fails (network, missing version, registry down), the
+        # action must still emit its `json` / counter outputs (set to the
+        # safe defaults below) instead of dying half-way and leaving
+        # downstream steps with no values. The `&&` short-circuit means we
+        # only invoke the CLI when the install succeeded; `cli_exit` then
+        # captures whichever step failed (install non-zero → cli_exit > 0,
+        # bin invocation non-zero → cli_exit > 0).
+        ghaar_install=$(mktemp -d "$RUNNER_TEMP/ghaar-install.XXXXXXXX")
         set +e
-        npx -y -p "github-actions-annotations-reporter@$GHAAR_VERSION" ghaar "${args[@]}"
+        npm install --silent --no-save --no-audit --no-fund --prefix "$ghaar_install" \
+          "github-actions-annotations-reporter@$GHAAR_VERSION" \
+          && "$ghaar_install/node_modules/.bin/ghaar" "${args[@]}"
         cli_exit=$?
         set -e
 
