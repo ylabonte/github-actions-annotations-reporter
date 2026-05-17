@@ -204,9 +204,17 @@ runs:
         # Run the CLI under suspended `errexit` so a non-zero exit (notably from
         # --fail-on-new) does NOT kill the script before we've written outputs.
         # Downstream steps need access to `json` / counts even when the action fails.
-        # `-p package binary` decouples the npm package name from its `bin` entry.
+        #
+        # Use `npm exec --package=…` with an explicit `--` separator rather than
+        # `npx -y -p X bin`: on ubuntu-latest runners (which ship npm 10.x by
+        # default until their image bundles npm 11), the `-p X` form of npx was
+        # observed to skip the install step and fall through to `sh -c "ghaar …"`
+        # → `command not found` → exit 127. `npm exec --package=…` is unambiguous
+        # about which token is the package spec and which is the bin to run, and
+        # works identically on npm 10 and 11. The `--yes` flag suppresses the
+        # interactive "install? y/N" prompt in fresh-cache scenarios.
         set +e
-        npx -y -p "github-actions-annotations-reporter@$GHAAR_VERSION" ghaar "${args[@]}"
+        npm exec --yes --package="github-actions-annotations-reporter@$GHAAR_VERSION" -- ghaar "${args[@]}"
         cli_exit=$?
         set -e
 
