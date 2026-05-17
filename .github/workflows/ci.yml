@@ -50,6 +50,9 @@ jobs:
           # Keep platform-specific coverage on a single modern Node line.
           - os: macos-latest
             node: '24'
+          # Keep Windows coverage for Windows-specific code paths:
+          # `path.relative`, `.cmd` shim spawn, and `pathToFileURL`
+          # main-module detection in `src/cli.ts`.
           - os: windows-latest
             node: '24'
     steps:
