@@ -57,7 +57,7 @@ Authentication:
   Anonymous is allowed but rate-limited (60 req/hr) and cannot create issues.
 
 Exit codes:
-  0  success — pipeline ran (issues filed/updated/closed as configured).
+  0  success — command completed successfully.
   1  error  — auth, repo resolution, or GitHub API failure.
   2  --fail-on-new was set and at least one new issue was created.
 
