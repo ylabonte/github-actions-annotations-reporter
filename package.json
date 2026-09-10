@@ -85,7 +85,7 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.3",
     "vitepress": "^1.6.4",
-    "vitest": "^4.1.6"
+    "vitest": "^5.0.0"
   },
   "packageManager": "pnpm@11.1.2"
 }
